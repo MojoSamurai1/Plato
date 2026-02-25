@@ -1,4 +1,12 @@
-# WordPress
+# WordPress core — exclude everything, then whitelist our plugin
+app/public/*
+!app/public/wp-content/
+app/public/wp-content/*
+!app/public/wp-content/plugins/
+app/public/wp-content/plugins/*
+!app/public/wp-content/plugins/plato-core/
+
+# WordPress config & generated
 wp-config.php
 wp-content/uploads/
 wp-content/upgrade/

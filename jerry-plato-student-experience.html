@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plato — Your Private AI Tutor: Student Experience Design</title>
+<style>
+  :root {
+    --plato-purple: #6C5CE7;
+    --plato-blue: #0984E3;
+    --plato-green: #00B894;
+    --plato-orange: #E17055;
+    --plato-pink: #FD79A8;
+    --plato-dark: #2D3436;
+    --plato-light: #F8F9FA;
+    --plato-gray: #636E72;
+    --plato-border: #DFE6E9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--plato-dark);
+    background: var(--plato-light);
+    line-height: 1.7;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--plato-purple), var(--plato-blue));
+    color: white;
+    padding: 80px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 3em; margin-bottom: 10px; font-weight: 300; }
+  .hero h1 strong { font-weight: 700; }
+  .hero .subtitle { font-size: 1.3em; opacity: 0.9; margin-bottom: 20px; }
+  .hero .tagline { font-size: 1em; opacity: 0.7; font-style: italic; }
+  .agent-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 8px 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+    font-size: 0.9em;
+  }
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+  section { margin-bottom: 60px; }
+  h2 {
+    font-size: 1.8em;
+    color: var(--plato-purple);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--plato-purple);
+  }
+  h3 {
+    font-size: 1.3em;
+    color: var(--plato-dark);
+    margin: 25px 0 12px;
+  }
+  h4 { color: var(--plato-blue); margin: 15px 0 8px; }
+  p { margin-bottom: 12px; color: #555; }
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin: 20px 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--plato-purple);
+  }
+  .card.green { border-left-color: var(--plato-green); }
+  .card.blue { border-left-color: var(--plato-blue); }
+  .card.orange { border-left-color: var(--plato-orange); }
+  .card.pink { border-left-color: var(--plato-pink); }
+  .persona-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .persona-card .left { border-right: 1px solid var(--plato-border); padding-right: 20px; }
+  .persona-card .right { padding-left: 10px; }
+  .persona-card h3 { margin-top: 0; }
+  .tag {
+    display: inline-block;
+    background: #EBF5FB;
+    color: var(--plato-blue);
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    margin: 3px 4px 3px 0;
+  }
+  .journey-step {
+    display: flex;
+    align-items: flex-start;
+    margin: 12px 0;
+    gap: 15px;
+  }
+  .step-num {
+    background: var(--plato-purple);
+    color: white;
+    min-width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9em;
+  }
+  .wireframe {
+    background: #1E272E;
+    color: #A4B0BD;
+    padding: 24px;
+    border-radius: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82em;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 15px 0;
+  }
+  .wireframe .highlight { color: #00D2D3; }
+  .wireframe .accent { color: #FF6B6B; }
+  .wireframe .green { color: #55EFC4; }
+  .wireframe .yellow { color: #FECA57; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  }
+  th {
+    background: var(--plato-purple);
+    color: white;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--plato-border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F8F9FA; }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .metric-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .metric-box .number { font-size: 2em; font-weight: 700; color: var(--plato-purple); }
+  .metric-box .label { font-size: 0.85em; color: var(--plato-gray); margin-top: 5px; }
+  .flow-arrow {
+    text-align: center;
+    color: var(--plato-purple);
+    font-size: 1.5em;
+    margin: 5px 0;
+  }
+  ul { margin: 8px 0 8px 20px; }
+  li { margin: 6px 0; color: #555; }
+  .toc { background: white; border-radius: 12px; padding: 25px 30px; margin: 30px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .toc a { color: var(--plato-purple); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { margin-left: 20px; }
+  .toc li { margin: 8px 0; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  footer {
+    text-align: center;
+    padding: 40px;
+    color: var(--plato-gray);
+    font-size: 0.9em;
+    border-top: 1px solid var(--plato-border);
+  }
+  @media (max-width: 700px) {
+    .persona-card { grid-template-columns: 1fr; }
+    .persona-card .left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--plato-border); padding-bottom: 20px; }
+    .hero h1 { font-size: 2em; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1><strong>Plato</strong> — Your Private AI Tutor</h1>
+  <p class="subtitle">Student Experience Design</p>
+  <p class="tagline">No pressure. No judgement. Your pace.</p>
+  <div class="agent-badge">Designed by Jerry — Product Manager</div>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#persona">User Persona — Mia</a></li>
+    <li><a href="#journeys">User Journeys</a></li>
+    <li><a href="#wireframes">Screen Wireframes</a></li>
+    <li><a href="#canvas">Canvas Integration UX</a></li>
+    <li><a href="#difference">The Plato Difference</a></li>
+    <li><a href="#metrics">Success Metrics</a></li>
+  </ol>
+</div>
+
+<!-- SECTION 1: PERSONA -->
+<section id="persona">
+  <h2>1. User Persona</h2>
+  <div class="persona-card">
+    <div class="left">
+      <h3>Mia — First-Year Student</h3>
+      <p><strong>Age:</strong> 18 &nbsp;|&nbsp; <strong>University:</strong> Torrens University, Australia</p>
+      <p><strong>Programme:</strong> First-year undergraduate</p>
+      <p><strong>Tech comfort:</strong> High — lives on her phone, uses Instagram, TikTok, Notion</p>
+      <p><strong>LMS:</strong> Canvas (mylearn.torrens.edu.au)</p>
+      <p><strong>SIS:</strong> Ellucian Banner (enrollment, grades, schedule)</p>
+      <h4>Baseline Assessment</h4>
+      <ul>
+        <li><strong>Experience Level:</strong> New (first time at uni)</li>
+        <li><strong>Knowledge Level:</strong> Basics (secondary school foundation)</li>
+        <li><strong>Confidence Level:</strong> Tentative ("I hope I can do this")</li>
+        <li><strong>Learning Goals:</strong> "I want to stay on top of my assignments and actually understand the material, not just pass"</li>
+      </ul>
+    </div>
+    <div class="right">
+      <h4>Pain Points</h4>
+      <ul>
+        <li>Canvas is overwhelming — too many modules, announcements, files</li>
+        <li>No clear picture of "where do I stand across all my subjects?"</li>
+        <li>Assignment briefs are long and confusing — hard to know where to start</li>
+        <li>Doesn't know how to study effectively at uni level</li>
+        <li>Feels isolated — studying from home, no study group</li>
+        <li>Procrastinates because she doesn't know what to prioritise</li>
+      </ul>
+      <h4>What She Wants</h4>
+      <ul>
+        <li>One place that tells her what to do next</li>
+        <li>To feel like she's making progress, not drowning</li>
+        <li>Help breaking big assignments into small steps</li>
+        <li>Someone (or something) that's always available to help</li>
+        <li>To feel confident walking into exams</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2: USER JOURNEYS -->
+<section id="journeys">
+  <h2>2. User Journeys</h2>
+
+  <div class="card">
+    <h3>Journey 1: Daily Study Flow</h3>
+    <p><em>"Open Plato and know where you stand"</em></p>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Open Plato</strong> — Learning Dashboard loads instantly. Mia sees her current focus areas, what's due soon, and her study streak.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>Check "What's Next"</strong> — Plato recommends a study topic based on upcoming due dates, weak areas, and spaced repetition schedule. "Design Principles reading is due Thursday — you're 40% through the module."</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Start Study Session</strong> — Tap to begin. Timer starts. Plato shows the topic context, key concepts, and any materials she's synced from Canvas.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Study</strong> — She reads, takes notes, watches lecture recordings. Plato is quietly there if she needs help.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Log Progress</strong> — Quick 4-tap reflection: What did you work on? How did it feel? (struggling / getting there / confident / mastered). What clicked? Done in under 60 seconds.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">6</div>
+      <div><strong>See Growth</strong> — Dashboard updates. Streak continues. If she has 5+ logs, an Insight Story appears: "You've spent 3 sessions on Design Principles this week — your confidence went from 'struggling' to 'getting there'. That's real progress!"</div>
+    </div>
+    <p><strong>Success:</strong> Mia closes the app feeling like she accomplished something concrete today.</p>
+  </div>
+
+  <div class="card green">
+    <h3>Journey 2: Assignment Preparation</h3>
+    <p><em>"Turn a scary brief into small, doable steps"</em></p>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Assignment arrives in Canvas</strong> — Plato detects it via sync (or Mia adds it manually). "New assignment: Brand Identity Case Study — due March 15"</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>Plato breaks it down</strong> — AI reads the brief and suggests a checklist: Research (3 days) → Draft outline (1 day) → First draft (3 days) → Review & edit (2 days) → Submit (1 day)</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Daily nudges</strong> — "Today's focus: Research phase. Find 3 brand case studies. You've got this!" Each step has a checkbox.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Track progress</strong> — As Mia completes steps, the assignment tracker shows a visual progress bar. She can log reflections at each stage.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Submit confidence</strong> — Before submission, Plato asks: "How confident do you feel about this?" and logs it. After grades come back, she can compare her confidence to her result.</div>
+    </div>
+    <p><strong>Success:</strong> Mia submits on time, feels prepared, and can see her process documented.</p>
+  </div>
+
+  <div class="card blue">
+    <h3>Journey 3: Exam Revision</h3>
+    <p><em>"Build confidence, not just cram"</em></p>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Exam mode activates</strong> — 2 weeks before exams, Plato suggests switching to revision mode. Dashboard highlights weak areas across all subjects.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>Spaced repetition kicks in</strong> — Plato generates review cards from her progress logs and study materials. Topics she marked "struggling" appear more frequently.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Practice questions</strong> — AI generates practice questions based on course content. Not just recall — application and analysis too (Bloom's taxonomy).</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Confidence tracker</strong> — Each revision session updates her confidence map. She can see topics moving from red → orange → green.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Exam day prep</strong> — Morning of the exam, Plato shows a calm summary: "You've revised 12 times this week. Your weakest area was X but you've improved 2 levels. You're ready."</div>
+    </div>
+    <p><strong>Success:</strong> Mia walks into the exam feeling prepared and confident, not panicked.</p>
+  </div>
+
+  <div class="card orange">
+    <h3>Journey 4: Weekly Review</h3>
+    <p><em>"Celebrate wins, plan ahead"</em></p>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Sunday notification</strong> — "Your weekly review is ready!" Mia opens Plato to see her week in review.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>This week's wins</strong> — "You studied 6 times this week (up from 4 last week). You completed the Design brief. Your confidence in Marketing went up!"</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Areas to focus</strong> — "Statistics is still feeling shaky — maybe give it an extra session this week?"</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Next week preview</strong> — Upcoming due dates, suggested study schedule, and priorities.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Set intention</strong> — "What's your goal for this week?" Mia types: "Finish the Marketing reading and start the Statistics assignment."</div>
+    </div>
+    <p><strong>Success:</strong> Mia starts Monday with a plan, not anxiety.</p>
+  </div>
+
+  <div class="card pink">
+    <h3>Journey 5: Canvas Sync Setup</h3>
+    <p><em>"Connect your uni, unlock your tutor"</em></p>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Onboarding prompt</strong> — During first setup, Plato asks: "Want to connect your university courses? This lets me see your assignments and due dates so I can help you stay on track."</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>Generate API token</strong> — Plato walks Mia through generating a Canvas API token: Settings → Approved Integrations → New Access Token. Step-by-step with screenshots.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Paste token</strong> — Mia pastes her token into Plato. Plato connects and shows: "Found 4 courses! Syncing now..."</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Review synced data</strong> — Mia sees her courses, assignments, and due dates populated. She can toggle what syncs.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Manual fallback</strong> — For anything Canvas can't provide, Mia can manually add courses, topics, and deadlines.</div>
+    </div>
+    <p><strong>Success:</strong> Mia's Plato account is connected to her uni in under 5 minutes.</p>
+  </div>
+</section>
+
+<!-- SECTION 3: WIREFRAMES -->
+<section id="wireframes">
+  <h2>3. Screen Wireframes</h2>
+
+  <h3>Learning Dashboard</h3>
+  <p>What Mia sees when she opens the app. Everything she needs in 10 seconds.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  <span class="highlight">PLATO</span>                    [Profile] [⚙]  │
+├─────────────────────────────────────────┤
+│                                         │
+│  <span class="green">Good morning, Mia!</span>          🔥 7-day   │
+│  You're on a roll this week.    streak   │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">📋 WHAT'S NEXT</span>                         │
+│  ┌───────────────────────────────────┐  │
+│  │ Design Principles — Ch.4 Reading │  │
+│  │ Due: Thursday  ·  40% complete   │  │
+│  │ [Continue Studying →]            │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">📊 YOUR COURSES</span>                        │
+│                                         │
+│  Design Principles    ████████░░  80%   │
+│  <span class="green">confident</span>                               │
+│                                         │
+│  Marketing 101        ██████░░░░  60%   │
+│  <span class="yellow">getting there</span>                           │
+│                                         │
+│  Statistics           ███░░░░░░░  30%   │
+│  <span class="accent">struggling</span>                              │
+│                                         │
+│  Communication        ███████░░░  70%   │
+│  <span class="green">confident</span>                               │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">💡 INSIGHT</span>                              │
+│  "You've improved 2 levels in Design    │
+│   this month. Your consistency is       │
+│   paying off!"                          │
+│                                         │
+├─────────────────────────────────────────┤
+│  [Dashboard]  [Courses]  [Log]  [Review]│
+└─────────────────────────────────────────┘</div>
+
+  <h3>Course Overview</h3>
+  <p>Drill into a specific course to see modules, assignments, and progress.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  [← Back]    <span class="highlight">Design Principles</span>          │
+│              Trimester 1, 2026          │
+├─────────────────────────────────────────┤
+│                                         │
+│  Overall: <span class="green">████████░░  80%  confident</span>     │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">📅 UPCOMING</span>                              │
+│  ┌───────────────────────────────────┐  │
+│  │ ⚡ Ch.4 Reading        Thu 27 Feb │  │
+│  │ 📝 Case Study Draft    Mon 3 Mar  │  │
+│  │ 📋 Final Submission    Fri 14 Mar │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">📚 MODULES</span>                              │
+│  ✅ Module 1: Intro to Design    100%   │
+│  ✅ Module 2: Color Theory        95%   │
+│  ✅ Module 3: Typography          85%   │
+│  🔄 Module 4: Layout & Grid      40%   │
+│  ⬜ Module 5: Brand Identity       0%   │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">📈 CONFIDENCE OVER TIME</span>                 │
+│                                         │
+│  Week 1  ▓░░░░  struggling              │
+│  Week 2  ▓▓░░░  getting there           │
+│  Week 3  ▓▓▓░░  getting there           │
+│  Week 4  ▓▓▓▓░  confident        ← now  │
+│                                         │
+│  [Start Study Session]                  │
+└─────────────────────────────────────────┘</div>
+
+  <h3>Study Session</h3>
+  <p>Active study mode — focused, minimal, with optional AI help.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  <span class="highlight">STUDYING</span>  Design Principles — Ch.4     │
+│  ⏱ 00:23:15                   [Pause]  │
+├─────────────────────────────────────────┤
+│                                         │
+│  <span class="yellow">Today's Focus</span>                          │
+│  Layout & Grid Systems                  │
+│                                         │
+│  <span class="highlight">Key Concepts</span>                            │
+│  • 12-column grid system                │
+│  • Whitespace and visual hierarchy      │
+│  • Responsive breakpoints               │
+│  • Alignment principles                 │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="green">📎 YOUR MATERIALS</span>                       │
+│  ┌───────────────────────────────────┐  │
+│  │ 📄 Lecture slides (from Canvas)  │  │
+│  │ 📄 Ch.4 Reading PDF              │  │
+│  │ 🎥 Lecture recording link        │  │
+│  │ 📝 Your notes from last session  │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">🤖 ASK PLATO</span>                            │
+│  ┌───────────────────────────────────┐  │
+│  │ "Explain the 12-column grid..."  │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  [End Session & Log Progress]           │
+└─────────────────────────────────────────┘</div>
+
+  <h3>Progress Log</h3>
+  <p>Quick reflection — 4 taps, under 60 seconds.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  <span class="highlight">LOG YOUR PROGRESS</span>          ⏱ 23 mins   │
+├─────────────────────────────────────────┤
+│                                         │
+│  <span class="yellow">What did you work on?</span>                  │
+│  [Design Principles ▼]  Layout & Grid   │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">How did it feel?</span>                        │
+│                                         │
+│  😰          😊          💪          🌟  │
+│  struggling  getting     confident  mastered
+│              there                      │
+│              [selected]                 │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">What clicked?</span> (optional)                │
+│  ┌───────────────────────────────────┐  │
+│  │ "The grid system finally makes   │  │
+│  │  sense — it's like a spreadsheet │  │
+│  │  for design!"                    │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">What's still fuzzy?</span> (optional)          │
+│  ┌───────────────────────────────────┐  │
+│  │ "Responsive breakpoints — when   │  │
+│  │  do I use which one?"            │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  [Save & See Dashboard →]               │
+└─────────────────────────────────────────┘</div>
+
+  <h3>Assignment Tracker</h3>
+  <p>Break down assignments into manageable steps with deadlines.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  [← Back]    <span class="highlight">ASSIGNMENT TRACKER</span>         │
+├─────────────────────────────────────────┤
+│                                         │
+│  <span class="yellow">Brand Identity Case Study</span>               │
+│  Design Principles  ·  Due: 14 March    │
+│  Progress: ████████░░░░  60%            │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">CHECKLIST</span>                               │
+│                                         │
+│  ✅ Read the assignment brief            │
+│  ✅ Research 3 brand case studies         │
+│  ✅ Create outline                        │
+│  ✅ Write introduction                    │
+│  🔄 Draft body sections          ← today │
+│  ⬜ Add visual examples                   │
+│  ⬜ Write conclusion                      │
+│  ⬜ Proofread and format                  │
+│  ⬜ Final review                          │
+│  ⬜ Submit on Canvas                      │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="green">💡 PLATO SAYS</span>                            │
+│  "You're past the halfway mark!         │
+│   At your current pace, you'll finish   │
+│   2 days before the deadline. Nice!"    │
+│                                         │
+│  <span class="highlight">⏰ SUGGESTED SCHEDULE</span>                   │
+│  Today:   Draft body sections (2 hrs)   │
+│  Tomorrow: Visual examples (1.5 hrs)    │
+│  Sunday:  Conclusion + proofread        │
+│                                         │
+│  [Log Study Session]                    │
+└─────────────────────────────────────────┘</div>
+
+  <h3>Weekly Review</h3>
+  <p>Celebrate wins and plan ahead — delivered every Sunday.</p>
+  <div class="wireframe">
+┌─────────────────────────────────────────┐
+│  <span class="highlight">WEEKLY REVIEW</span>       Week of 17-23 Feb   │
+├─────────────────────────────────────────┤
+│                                         │
+│  <span class="green">🎉 THIS WEEK'S WINS</span>                     │
+│  • Studied 6 times (↑ from 4 last week) │
+│  • Completed Design Ch.3 reading        │
+│  • Marketing confidence: ↑ 1 level      │
+│  • 7-day study streak!                  │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="yellow">📊 BY THE NUMBERS</span>                       │
+│  Study sessions:  6    Total time: 8.5h │
+│  Topics covered:  4    Logs made:  6    │
+│  Avg confidence:  getting there (2.4)   │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="accent">🎯 FOCUS AREAS</span>                          │
+│  Statistics still needs attention —     │
+│  you haven't studied it in 5 days.      │
+│  Maybe give it an extra session?        │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="highlight">📅 NEXT WEEK PREVIEW</span>                    │
+│  • Design Case Study draft — Mon        │
+│  • Marketing quiz — Wed                 │
+│  • Statistics tutorial — Thu            │
+│                                         │
+├─────────────────────────────────────────┤
+│  <span class="green">💭 SET YOUR INTENTION</span>                    │
+│  ┌───────────────────────────────────┐  │
+│  │ "What's your goal this week?"    │  │
+│  │                                  │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  [Save & Start the Week →]              │
+└─────────────────────────────────────────┘</div>
+</section>
+
+<!-- SECTION 4: CANVAS INTEGRATION -->
+<section id="canvas">
+  <h2>4. Canvas Integration UX</h2>
+
+  <div class="card">
+    <h3>How It Works</h3>
+    <p>Canvas LMS (used by Torrens University) has a <strong>REST API</strong> that students can access using a personal API token. This is the primary integration method.</p>
+
+    <h4>Setup Flow (One-Time, ~5 Minutes)</h4>
+    <div class="journey-step">
+      <div class="step-num">1</div>
+      <div><strong>Plato onboarding</strong> — "Want to connect your uni courses?" with a friendly explanation of what data syncs and what doesn't.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">2</div>
+      <div><strong>Generate token</strong> — Step-by-step guide: Log into Canvas → Account → Settings → New Access Token → Copy it.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">3</div>
+      <div><strong>Paste into Plato</strong> — Single input field. Plato validates and connects.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">4</div>
+      <div><strong>Course discovery</strong> — Plato shows found courses. Mia selects which ones to sync.</div>
+    </div>
+    <div class="journey-step">
+      <div class="step-num">5</div>
+      <div><strong>Initial sync</strong> — Assignments, due dates, modules, and syllabus pulled in. Dashboard populates.</div>
+    </div>
+
+    <h4>What Syncs</h4>
+    <table>
+      <tr><th>Data</th><th>Source</th><th>Sync Frequency</th></tr>
+      <tr><td>Course list & enrollment</td><td>Canvas API</td><td>On connect + daily</td></tr>
+      <tr><td>Assignments & due dates</td><td>Canvas API</td><td>Every 6 hours</td></tr>
+      <tr><td>Module structure</td><td>Canvas API</td><td>Daily</td></tr>
+      <tr><td>Syllabus</td><td>Canvas API</td><td>On connect</td></tr>
+      <tr><td>Grades (when posted)</td><td>Canvas API</td><td>Every 6 hours</td></tr>
+      <tr><td>Announcement titles</td><td>Canvas API</td><td>Every 6 hours</td></tr>
+      <tr><td>Calendar events</td><td>Canvas API / iCal</td><td>Every 6 hours</td></tr>
+    </table>
+
+    <h4>What Doesn't Sync (Privacy First)</h4>
+    <ul>
+      <li>Discussion posts or private messages</li>
+      <li>Other students' data</li>
+      <li>Submission content (only status)</li>
+      <li>Canvas analytics or page views</li>
+    </ul>
+
+    <h4>Manual Fallback</h4>
+    <p>If API access isn't available or for content Canvas doesn't expose, Mia can always:</p>
+    <ul>
+      <li>Manually add courses, topics, and deadlines</li>
+      <li>Upload assignment briefs (PDF/text)</li>
+      <li>Add study materials and notes directly</li>
+      <li>Use the iCal feed URL for calendar sync (no API token needed)</li>
+    </ul>
+  </div>
+</section>
+
+<!-- SECTION 5: THE PLATO DIFFERENCE -->
+<section id="difference">
+  <h2>5. The Plato Difference</h2>
+  <p>Why Mia would use Plato alongside Canvas, not instead of it.</p>
+
+  <div class="card">
+    <h3>Canvas is a filing cabinet. Plato is a tutor.</h3>
+    <table>
+      <tr><th>Dimension</th><th>Canvas Alone</th><th>Canvas + Plato</th></tr>
+      <tr>
+        <td><strong>Daily question</strong></td>
+        <td>"What's due?" (anxiety-driven)</td>
+        <td>"What should I study next?" (growth-driven)</td>
+      </tr>
+      <tr>
+        <td><strong>Progress view</strong></td>
+        <td>Grades and submission status</td>
+        <td>Confidence levels, mastery growth, study patterns</td>
+      </tr>
+      <tr>
+        <td><strong>Assignments</strong></td>
+        <td>Brief + due date</td>
+        <td>Broken into steps with a schedule and encouragement</td>
+      </tr>
+      <tr>
+        <td><strong>Exam prep</strong></td>
+        <td>Re-read materials</td>
+        <td>Spaced repetition, practice questions, confidence tracking</td>
+      </tr>
+      <tr>
+        <td><strong>Reflection</strong></td>
+        <td>None</td>
+        <td>60-second progress logs that build a learning profile</td>
+      </tr>
+      <tr>
+        <td><strong>Motivation</strong></td>
+        <td>Grades (high pressure)</td>
+        <td>Streaks, insights, celebration, growth visibility</td>
+      </tr>
+      <tr>
+        <td><strong>Availability</strong></td>
+        <td>Content repository</td>
+        <td>Always-on AI tutor that knows your patterns</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card green">
+    <h3>The Six Differentiators</h3>
+    <h4>1. Adaptive Recommendations</h4>
+    <p>Plato learns what Mia struggles with and nudges her toward those topics — gently, not aggressively. "Statistics hasn't had a session in 5 days — fancy a quick 20 minutes?"</p>
+
+    <h4>2. Spaced Repetition for Exam Prep</h4>
+    <p>Based on the Ebbinghaus forgetting curve, Plato schedules review sessions at optimal intervals. Topics she rated "struggling" come back sooner and more often.</p>
+
+    <h4>3. Confidence Tracking (Not Grades)</h4>
+    <p>Plato tracks how Mia <em>feels</em> about her learning, not just what grades she gets. This catches issues early — a student can pass but still feel lost, or struggle but be making real progress.</p>
+
+    <h4>4. Encouragement & Insight Stories</h4>
+    <p>After enough data, Plato generates warm observations: "Did you notice you study best in the morning? Your confidence ratings are highest before noon." Never preachy, always curious.</p>
+
+    <h4>5. Study Habit Optimisation</h4>
+    <p>Over time, Plato learns when Mia studies best, how long her focus lasts, which subjects she avoids, and gently helps her build better habits.</p>
+
+    <h4>6. Assignment Decomposition</h4>
+    <p>AI breaks complex assignments into step-by-step checklists with suggested timelines. Turns "write a 3000-word case study" into 10 manageable tasks.</p>
+  </div>
+</section>
+
+<!-- SECTION 6: SUCCESS METRICS -->
+<section id="metrics">
+  <h2>6. Success Metrics</h2>
+  <p>How we know Plato is working for Mia.</p>
+
+  <div class="metric-grid">
+    <div class="metric-box">
+      <div class="number">80%</div>
+      <div class="label">Log completion rate<br>(started → finished)</div>
+    </div>
+    <div class="metric-box">
+      <div class="number">50%</div>
+      <div class="label">Daily dashboard opens<br>(habit formation)</div>
+    </div>
+    <div class="metric-box">
+      <div class="number">3+</div>
+      <div class="label">Activities logged<br>in first month</div>
+    </div>
+    <div class="metric-box">
+      <div class="number">↑ 1 level</div>
+      <div class="label">Average confidence increase<br>after 2 weeks</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Key Metrics Table</h3>
+    <table>
+      <tr><th>Metric</th><th>Target</th><th>How We Measure</th></tr>
+      <tr><td>Knowledge confidence</td><td>Users report higher confidence after 2 weeks</td><td>Self-assessment trend in progress logs</td></tr>
+      <tr><td>Dashboard usage</td><td>50% of users check dashboard daily</td><td>App open events</td></tr>
+      <tr><td>Log completion rate</td><td>80% of started logs completed</td><td>Log start vs. save events</td></tr>
+      <tr><td>Repeat usage</td><td>50% of users log 3+ activities in first month</td><td>Retention analytics</td></tr>
+      <tr><td>Mastery improvement</td><td>Measurable improvement in self-assessed mastery</td><td>Progress log data over time</td></tr>
+      <tr><td>Assignment on-time rate</td><td>90% of tracked assignments submitted on time</td><td>Assignment tracker data</td></tr>
+      <tr><td>Canvas connection rate</td><td>70% of users connect Canvas within first week</td><td>Onboarding funnel</td></tr>
+    </table>
+  </div>
+
+  <div class="card orange">
+    <h3>Anti-Metrics (What We Don't Optimise For)</h3>
+    <ul>
+      <li><strong>Time in app</strong> — We want effective study, not addictive scrolling</li>
+      <li><strong>Number of features used</strong> — Simple is better than comprehensive</li>
+      <li><strong>Social engagement</strong> — This is a personal tutor, not a social network</li>
+      <li><strong>Grade prediction accuracy</strong> — We track confidence, not grades</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <p><strong>Plato — Your Private AI Tutor</strong></p>
+  <p>Designed by Jerry (Product Manager) · February 2026</p>
+  <p>No pressure. No judgement. Your pace.</p>
+</footer>
+
+</body>
+</html>

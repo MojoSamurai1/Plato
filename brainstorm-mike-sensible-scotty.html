@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plato Brainstorm &#8212; Excitable Mike, Captain Sensible &amp; Scotty</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f0f1a; color: #e0e0e8; line-height: 1.7; overflow-x: hidden; }
+  .hero { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 80px 40px; text-align: center; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(255,107,53,0.08) 0%, transparent 50%), radial-gradient(circle at 70% 50%, rgba(72,199,142,0.08) 0%, transparent 50%), radial-gradient(circle at 50% 30%, rgba(99,145,255,0.08) 0%, transparent 50%); animation: slowPulse 15s ease-in-out infinite; }
+  @keyframes slowPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .hero h1 { font-size: 3rem; font-weight: 900; background: linear-gradient(135deg, #ff6b35, #f7c948, #48c78e, #6391ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: relative; margin-bottom: 12px; }
+  .hero .subtitle { font-size: 1.2rem; color: #8888aa; position: relative; margin-bottom: 40px; }
+  .characters { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; position: relative; margin-top: 20px; }
+  .char-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 28px 24px; width: 260px; backdrop-filter: blur(10px); transition: transform 0.3s, box-shadow 0.3s; }
+  .char-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .char-card .emoji { font-size: 2.5rem; margin-bottom: 10px; }
+  .char-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
+  .char-card p { font-size: 0.88rem; color: #9999bb; line-height: 1.5; }
+  .char-card.mike { border-color: rgba(255,107,53,0.3); } .char-card.mike h3 { color: #ff6b35; }
+  .char-card.sensible { border-color: rgba(72,199,142,0.3); } .char-card.sensible h3 { color: #48c78e; }
+  .char-card.scotty { border-color: rgba(99,145,255,0.3); } .char-card.scotty h3 { color: #6391ff; }
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  .round-header { margin: 60px 0 30px; padding: 20px 28px; border-radius: 12px; font-size: 1.5rem; font-weight: 800; position: relative; }
+  .round-header .round-num { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 4px; opacity: 0.6; }
+  .round-header.r1 { background: linear-gradient(135deg, rgba(255,107,53,0.15), rgba(255,107,53,0.05)); border-left: 4px solid #ff6b35; color: #ff6b35; }
+  .round-header.r2 { background: linear-gradient(135deg, rgba(72,199,142,0.15), rgba(72,199,142,0.05)); border-left: 4px solid #48c78e; color: #48c78e; }
+  .round-header.r3 { background: linear-gradient(135deg, rgba(99,145,255,0.15), rgba(99,145,255,0.05)); border-left: 4px solid #6391ff; color: #6391ff; }
+  .round-header.r4 { background: linear-gradient(135deg, rgba(247,201,72,0.15), rgba(247,201,72,0.05)); border-left: 4px solid #f7c948; color: #f7c948; }
+  .round-header.r5 { background: linear-gradient(135deg, rgba(180,120,255,0.15), rgba(180,120,255,0.05)); border-left: 4px solid #b478ff; color: #b478ff; }
+  .speech { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; margin-top: 4px; }
+  .avatar.mike { background: rgba(255,107,53,0.2); } .avatar.sensible { background: rgba(72,199,142,0.2); } .avatar.scotty { background: rgba(99,145,255,0.2); }
+  .bubble { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; border-top-left-radius: 4px; padding: 16px 20px; flex: 1; position: relative; }
+  .bubble .name { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .bubble.mike { border-color: rgba(255,107,53,0.15); } .bubble.mike .name { color: #ff6b35; }
+  .bubble.sensible { border-color: rgba(72,199,142,0.15); } .bubble.sensible .name { color: #48c78e; }
+  .bubble.scotty { border-color: rgba(99,145,255,0.15); } .bubble.scotty .name { color: #6391ff; }
+  .bubble p { margin-bottom: 8px; font-size: 0.95rem; } .bubble p:last-child { margin-bottom: 0; }
+  .bubble strong { color: #fff; } .bubble em { color: #bbb; font-style: italic; }
+  .idea-num { display: inline-block; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-size: 0.75rem; font-weight: 700; margin-right: 8px; vertical-align: middle; }
+  .idea-num.mike { background: rgba(255,107,53,0.25); color: #ff6b35; }
+  .verdict { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-left: 4px; }
+  .verdict.keep { background: rgba(72,199,142,0.2); color: #48c78e; }
+  .verdict.modify { background: rgba(247,201,72,0.2); color: #f7c948; }
+  .verdict.park { background: rgba(255,80,80,0.2); color: #ff5050; }
+  .shortlist-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(247,201,72,0.15); border-radius: 16px; padding: 24px 28px; margin-bottom: 24px; position: relative; }
+  .shortlist-item .priority { position: absolute; top: -12px; left: 20px; background: #f7c948; color: #1a1a2e; font-weight: 800; font-size: 0.75rem; padding: 4px 14px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; }
+  .shortlist-item h3 { color: #fff; font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; margin-top: 6px; }
+  .shortlist-item .desc { color: #bbbbdd; font-size: 0.92rem; margin-bottom: 14px; }
+  .tech-spec { background: rgba(99,145,255,0.08); border: 1px solid rgba(99,145,255,0.15); border-radius: 10px; padding: 14px 18px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.6; color: #99bbff; }
+  .tech-spec .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: #6391ff; margin-bottom: 6px; }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); margin: 24px 0; }
+  .stage { text-align: center; font-style: italic; color: #666688; margin: 30px 0; font-size: 0.9rem; }
+  @media (max-width: 600px) { .hero { padding: 50px 20px; } .hero h1 { font-size: 1.8rem; } .characters { gap: 16px; } .char-card { width: 100%; max-width: 300px; } .container { padding: 20px 16px 60px; } .round-header { font-size: 1.2rem; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Plato Brainstorm Session</h1>
+  <p class="subtitle">Excitable Mike, Captain Sensible &amp; Scotty hash out the future of AI tutoring</p>
+  <div class="characters">
+    <div class="char-card mike">
+      <div class="emoji">&#x1F680;</div>
+      <h3>Excitable Mike</h3>
+      <p>The wild ideas guy. No filter. Thinks big. Gets carried away. Some ideas are genius, some are absolutely bonkers.</p>
+    </div>
+    <div class="char-card sensible">
+      <div class="emoji">&#x1F3AF;</div>
+      <h3>Captain Sensible</h3>
+      <p>The pragmatist. Evaluates, grounds, and tempers. Asks &#8220;but will it actually work?&#8221; Focuses on MVP and real value.</p>
+    </div>
+    <div class="char-card scotty">
+      <div class="emoji">&#x1F527;</div>
+      <h3>Scotty</h3>
+      <p>The engineer. APIs, data models, architecture. Knows the WordPress + Next.js stack inside out. Pragmatic but inventive.</p>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <p class="stage">*The three settle around a whiteboard. Mike already has three markers and is bouncing on his toes. Coffee count: Mike (3), Sensible (1, herbal tea), Scotty (2, black).*</p>
+
+  <div class="round-header r1"><span class="round-num">Round 1</span>Blue Sky &#8212; Mike&#8217;s Idea Avalanche</div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>RIGHT. Buckle up lads. I&#8217;ve been up since 4am thinking about this and I have SO many ideas. Plato is going to be the greatest AI tutor the world has ever seen. Ready?</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><em>*sighs*</em> Go ahead, Mike. But I&#8217;m keeping score.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">1</span> <strong>Canvas Assignment Autopilot!</strong> Plato syncs with Canvas LMS, pulls all her assignments, due dates, rubrics, and course materials automatically. She never has to manually enter anything. Plato just KNOWS what she&#8217;s studying. It&#8217;s like having a personal secretary for uni!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">2</span> <strong>Exam Question Predictor!</strong> Plato analyses past exam papers, lecture slides, and the course outline, then uses AI to PREDICT what&#8217;s going to be on the exam. Like... statistically. It weights topics by how much lecture time they got, how often they appeared in past papers, and what the lecturer emphasised. She walks in knowing what&#8217;s coming!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">3</span> <strong>The Semester XP System!</strong> Full gamification. Every study session earns XP. Every quiz passed levels you up. There are achievements like &#8220;Night Owl&#8221; for late study sessions, &#8220;Streak Master&#8221; for 7 consecutive days, and &#8220;Deep Diver&#8221; for spending more than 2 hours on a single topic. Leaderboards against yourself, not others. You&#8217;re competing against Past You!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">4</span> <strong>Smart Flashcards with Spaced Repetition!</strong> Plato automatically generates flashcards from lecture notes and readings, then uses a spaced repetition algorithm to serve them at the PERFECT moment before you forget. Like Anki but it builds the cards FOR you. No more spending hours making flashcards &#8212; that&#8217;s not learning, that&#8217;s admin!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">5</span> <strong>The Socratic Tutor Mode!</strong> Instead of giving answers, Plato asks guiding questions. Like the real Plato! &#8220;What do you think would happen if...?&#8221; &#8220;Can you explain why X leads to Y?&#8221; It forces deeper thinking. And it adapts &#8212; if she&#8217;s struggling, it gives more scaffolding. If she&#8217;s flying, it pushes harder. Proper adaptive learning!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">6</span> <strong>Study Meme Generator!</strong> Plato creates custom memes related to her course content. Like &#8220;One does not simply ignore the Central Limit Theorem&#8221; or discipline-specific ones. Humour aids memory! There&#8217;s actual research on this! People remember funny things!</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Mike, did you just cite &#8220;there&#8217;s actual research&#8221; without citing any actual research?</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>MOVING ON.</p><p><span class="idea-num mike">7</span> <strong>Wellbeing Check-ins!</strong> Uni is stressful. Plato checks in: &#8220;How are you feeling about your workload today?&#8221; If she&#8217;s overwhelmed, it suggests breaking tasks down, or taking a break, or adjusting the study plan. It tracks stress levels over time and notices patterns. &#8220;You always feel stressed on Tuesdays &#8212; let&#8217;s lighten your Tuesday study load.&#8221; Mental health matters!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">8</span> <strong>Assignment Draft Reviewer!</strong> She pastes in her essay draft and Plato reviews it against the rubric. Not writing it for her &#8212; that&#8217;s academic misconduct &#8212; but giving feedback like &#8220;Your introduction doesn&#8217;t address criteria 3&#8221; or &#8220;This paragraph lacks evidence&#8221; or &#8220;Your argument structure could be stronger here.&#8221; Like having a tutor read your draft at 11pm on a Sunday.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">9</span> <strong>Study Session Voice Mode!</strong> Talk to Plato like a real tutor. Ask questions out loud while you&#8217;re cooking dinner or on the bus. Plato explains concepts conversationally. Like a podcast that answers back. Hands-free studying!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">10</span> <strong>The Knowledge Map!</strong> A visual graph of everything she&#8217;s learned. Topics are nodes, connections between them are edges. You can SEE how &#8220;statistics&#8221; connects to &#8220;research methods&#8221; connects to &#8220;data analysis.&#8221; Gaps in knowledge show up as dim nodes. It&#8217;s like a skill tree in an RPG but for actual knowledge!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">11</span> <strong>Lecture Slide Summariser!</strong> Upload lecture slides (PDF/PPTX) and Plato condenses them into study notes. Extracts key concepts, definitions, and important points. Saves hours of note-taking. And it cross-references with the textbook to fill in gaps the lecturer skipped!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">12</span> <strong>Smart Notifications!</strong> Not annoying ones. Smart ones. &#8220;You have 3 assignments due next week &#8212; want to see a study plan?&#8221; or &#8220;You haven&#8217;t reviewed Marketing Theory in 8 days &#8212; your retention is probably at 40% by now&#8221; or &#8220;Your exam is in 5 days &#8212; here&#8217;s a cramming strategy based on your weak areas.&#8221; Context-aware, helpful nudges.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">13</span> <strong>Study Group Matchmaker!</strong> Plato connects students studying the same course. &#8220;Three other Plato users are studying BUS101 this week &#8212; want to form a study group?&#8221; Collaborative learning! Maybe even a shared quiz mode!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">14</span> <strong>The &#8220;Explain Like I&#8217;m 5&#8221; Button!</strong> Any concept, any time. Hit the ELI5 button and Plato re-explains it using simple analogies, everyday language, and concrete examples. If the textbook says &#8220;heteroscedasticity,&#8221; Plato says &#8220;imagine your dart throws getting wilder the further from the board you stand.&#8221; Understanding FIRST, jargon second!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><span class="idea-num mike">15</span> <strong>The Pomodoro Focus Mode!</strong> Built-in study timer with Pomodoro technique. 25 mins study, 5 min break. But SMART &#8212; Plato tracks what you studied in each pomodoro and logs it. After 4 pomodoros, it suggests switching topics based on what needs attention. And during breaks, it serves a fun fact related to your course. Even breaks are learning!</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p><em>*drops markers dramatically*</em> FIFTEEN! Beat THAT!</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><em>*quietly*</em> Some of those are actually the same idea wearing different hats, Mike.</p></div></div>
+
+  <p class="stage">*Captain Sensible finishes his tea, puts the cup down deliberately, and uncaps a green marker.*</p>
+
+  <!-- ROUND 2 -->
+  <div class="round-header r2"><span class="round-num">Round 2</span>Reality Check &#8212; Captain Sensible&#8217;s Verdict</div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Right. Let&#8217;s go through these one by one. I&#8217;m giving each a <span class="verdict keep">Keep</span>, <span class="verdict modify">Modify</span>, or <span class="verdict park">Park</span>. &#8220;Park&#8221; doesn&#8217;t mean it&#8217;s bad &#8212; it means not now.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>1. Canvas Assignment Autopilot</strong> <span class="verdict keep">Keep</span></p><p>This is the foundation. If Plato doesn&#8217;t know what she&#8217;s studying, everything else is just a fancy chatbot. Canvas LMS has a well-documented REST API and Torrens definitely uses it. This is non-negotiable for the MVP. The question is how much we pull &#8212; I&#8217;d say start with assignments, due dates, and course enrolments. Leave rubrics and materials for later.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>2. Exam Question Predictor</strong> <span class="verdict park">Park</span></p><p>Love the ambition, Mike, but this requires access to past exams which most unis lock down. Also raises academic integrity questions. If a student says &#8220;my AI predicted these questions,&#8221; that&#8217;s a conversation with the academic integrity board you don&#8217;t want to have. Park it. Maybe later as a &#8220;topic likelihood analysis&#8221; &#8212; softer framing.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>But the DATA is there! Lecturers are predictable!</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Parked, Mike. Moving on.</p><p><strong>3. Semester XP System</strong> <span class="verdict modify">Modify</span></p><p>Gamification works, but full leaderboards and achievement systems are a lot of UI work for unclear payoff. Modify: implement a simple streak counter and weekly study goals first. If engagement data shows she responds to it, THEN we build out the XP system. Start with streaks + progress bars, not a full RPG.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>4. Smart Flashcards with Spaced Repetition</strong> <span class="verdict keep">Keep</span></p><p>This is a killer feature. Proven pedagogy. Clear value. The auto-generation from course content is the differentiator &#8212; Anki requires you to make your own cards. This saves time AND improves retention. Strong keep. This is a top-3 feature.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>5. Socratic Tutor Mode</strong> <span class="verdict keep">Keep</span></p><p>This IS Plato. Literally named after the guy who invented this method. This is the core interaction model. When she asks Plato a question, it should guide her to the answer rather than just spitting it out. This is what separates Plato from ChatGPT. Absolute keep. This is priority one for the AI interaction design.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>6. Study Meme Generator</strong> <span class="verdict park">Park</span></p><p>Fun? Yes. Core value? No. This is a &#8220;delight&#8221; feature, not a &#8220;need&#8221; feature. Park it for when we have the basics nailed. Maybe revisit as a notification add-on &#8212; one meme a day related to what she&#8217;s studying. But not now.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>You&#8217;re parking joy, Sensible. You&#8217;re literally parking JOY.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>I&#8217;m prioritising. There&#8217;s a difference.</p><p><strong>7. Wellbeing Check-ins</strong> <span class="verdict modify">Modify</span></p><p>Important, but needs careful handling. We&#8217;re not therapists and Plato shouldn&#8217;t pretend to be. Modify: simple mood tracking with a &#8220;how&#8217;s your workload?&#8221; prompt. If she reports being overwhelmed, Plato adjusts the study plan to be lighter. No pattern analysis or mental health insights &#8212; that&#8217;s a liability minefield. Just responsive adjustment.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>8. Assignment Draft Reviewer</strong> <span class="verdict keep">Keep</span></p><p>Massive value. This is the &#8220;11pm on Sunday before it&#8217;s due&#8221; feature. Key guardrail: it must NEVER write content for her. Review against rubric, flag weaknesses, suggest improvements in structure and argumentation. This is tutoring, not ghostwriting. With that guardrail, strong keep.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>9. Voice Mode</strong> <span class="verdict park">Park</span></p><p>Great idea, terrible timing. Voice requires speech-to-text, text-to-speech, latency management, and a completely different UX. This is a v3 feature. Park it hard. Focus on text-based interaction first.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>10. Knowledge Map</strong> <span class="verdict park">Park</span></p><p>Visually stunning but technically complex. Requires a topic ontology, relationship mapping, and a graph visualisation library. Cool for a pitch deck. Not practical for an MVP. Park for v2. Use a simpler progress view initially &#8212; a list of topics with mastery levels.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>11. Lecture Slide Summariser</strong> <span class="verdict keep">Keep</span></p><p>This is the content ingestion pipeline. She uploads her lecture slides, Plato processes them, and now Plato understands the course content deeply. This feeds into flashcard generation, the Socratic tutor, and the draft reviewer. This is infrastructure as much as it is a feature. Keep.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>12. Smart Notifications</strong> <span class="verdict modify">Modify</span></p><p>Good concept but needs restraint. Nobody wants another app nagging them. Modify: start with three notification types only. Assignment due date reminders (3 days, 1 day). Retention decay alerts (&#8220;You haven&#8217;t reviewed X in a while&#8221;). Weekly study summary. That&#8217;s it. Three. No more.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>13. Study Group Matchmaker</strong> <span class="verdict park">Park</span></p><p>This requires multiple users at the same university studying the same course using Plato. We have ONE user. Park this until the user base exists. Good idea for scale, irrelevant for now.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>14. &#8220;Explain Like I&#8217;m 5&#8221; Button</strong> <span class="verdict keep">Keep</span></p><p>Simple. Powerful. Low effort to implement. This is just a prompt engineering pattern on top of the existing AI tutor. &#8220;Re-explain this concept using simple language and everyday analogies.&#8221; It&#8217;s a UX enhancement to the Socratic tutor, not a separate feature. Keep, and fold it into the tutor interface.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>15. Pomodoro Focus Mode</strong> <span class="verdict modify">Modify</span></p><p>The timer is dead simple, but the smart topic-switching and break content is scope creep. Modify: build a basic study session timer that logs what was studied and for how long. That data feeds the learning dashboard. Keep it lean &#8212; she can use any Pomodoro app, but the SESSION LOGGING is what Plato needs.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p><strong>Summary:</strong></p><p><span class="verdict keep">Keep</span> Canvas Sync, Smart Flashcards, Socratic Tutor, Draft Reviewer, Slide Summariser, ELI5 Button</p><p><span class="verdict modify">Modify</span> XP System (streaks only), Wellbeing (mood + adjustment), Notifications (3 types), Pomodoro (session logging)</p><p><span class="verdict park">Park</span> Exam Predictor, Meme Generator, Voice Mode, Knowledge Map, Study Groups</p></div></div>
+
+  <p class="stage">*Scotty has been scribbling diagrams on a napkin this entire time. He looks up.*</p>
+
+  <!-- ROUND 3 -->
+  <div class="round-header r3"><span class="round-num">Round 3</span>Technical Feasibility &#8212; Scotty&#8217;s Assessment</div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>Right, I&#8217;ve been thinking about how these fit into our stack. WordPress backend, Next.js PWA frontend, REST API between them. Let me go through the keeps and modifies.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Canvas Sync</strong> &#8212; Very doable. Canvas has a mature REST API. We&#8217;d need the student to authenticate via OAuth 2.0 (Canvas supports it). We store the access token in WordPress, set up a WP-Cron job to pull assignments, due dates, and course enrolments every 6 hours. Data goes into our custom tables. The PWA reads it via our own plato/v1 REST endpoints. One complication: Torrens might restrict API access to institutional apps. We may need to use Canvas&#8217;s personal access tokens as a fallback &#8212; the student generates one in their Canvas settings.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Can she generate a personal access token easily?</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>It&#8217;s in Canvas settings. Takes 30 seconds. We&#8217;d walk her through it with a setup wizard in the PWA. Not ideal but perfectly workable as an MVP approach. If we grow, we apply for an institutional API key.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Smart Flashcards + Spaced Repetition</strong> &#8212; The SM-2 algorithm is well-documented and straightforward to implement. We&#8217;d need new database tables: <code>plato_flashcards</code> (card content, source material reference, course ID) and <code>plato_review_schedule</code> (next review date, interval, ease factor, repetition count). Card generation is the interesting part &#8212; we send the processed course content to an LLM with a prompt that extracts key concept/answer pairs. The PWA presents cards due for review, user rates difficulty (1-5), backend recalculates the next review date. Standard SM-2 loop.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>Can the cards have images? What about diagrams?</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>Text first. Images are a v2 thing &#8212; we&#8217;d need image extraction from slides, storage in WordPress uploads, and serving via the API. Not hard but adds complexity. Text cards are the MVP.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Socratic Tutor Mode</strong> &#8212; This is primarily a prompt engineering challenge. The backend stores conversation history in a <code>plato_conversations</code> table. Each message has a role (user/assistant), content, and a reference to the topic being discussed. The system prompt instructs the LLM to use Socratic questioning. We include the student&#8217;s mastery level for the topic so the AI calibrates difficulty. The ELI5 button is just an additional instruction appended to the system prompt: &#8220;Re-explain using simple analogies suitable for a beginner.&#8221; Both features share the same chat infrastructure.</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>One thing to flag: we need to choose our LLM provider. OpenAI&#8217;s API is the obvious choice &#8212; GPT-4o for tutoring, GPT-4o-mini for flashcard generation and summarisation to keep costs down. We&#8217;d proxy all LLM calls through our WordPress backend so the API key stays server-side. The PWA never talks to OpenAI directly.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>What about Claude? We&#8217;re literally being built by Claude right now.</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>Ha. Fair point. The architecture is LLM-agnostic &#8212; we abstract the provider behind an interface in the WordPress plugin. We can swap between OpenAI, Anthropic, or even local models later. The tutor system prompt and conversation structure stays the same regardless of provider.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Assignment Draft Reviewer</strong> &#8212; Technically similar to the Socratic tutor. She pastes text into a form, we send it to the LLM along with the rubric (pulled from Canvas or manually entered). The prompt says: &#8220;Review this draft against the following rubric criteria. Do NOT rewrite any content. Identify weaknesses, gaps in argumentation, and missing rubric requirements. Provide specific, actionable feedback.&#8221; We store the review alongside the conversation so she can refer back to it. We need to enforce a character limit &#8212; say 10,000 characters for the MVP &#8212; to manage API costs.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Lecture Slide Summariser</strong> &#8212; This is our content ingestion pipeline. File upload through the PWA (drag and drop, accepts PDF and PPTX). The file goes to WordPress via the REST API, gets stored in <code>wp-content/uploads</code>. A background process extracts text &#8212; for PDFs we use a PHP library like <code>smalot/pdfparser</code>, for PPTX we parse the XML inside the zip. Extracted text gets chunked and sent to the LLM for summarisation. Output stored in a <code>plato_study_notes</code> table linked to the course. This content then feeds the flashcard generator and the tutor&#8217;s knowledge base for that course.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>What about lecture RECORDINGS? Video!</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>Park it, Mike. Video transcription is a whole other pipeline. Slides and PDFs first. If Canvas provides transcript links for recorded lectures, we could pull those as text &#8212; but that&#8217;s an optimisation, not MVP.</p></div></div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Modified Features &#8212; Quick Takes:</strong></p><p><strong>Streaks + Progress:</strong> Simple. A <code>plato_study_sessions</code> table with timestamp, duration, and topic. Frontend calculates streak from consecutive days with logged sessions. Progress bars are just SQL aggregations against the mastery tracking we already have in the schema.</p><p><strong>Wellbeing Mood Check:</strong> Add a <code>mood_rating</code> column (1-5) to the study sessions table. Before each session, a one-tap mood selector. If mood is low (1-2), the study plan adjusts to lighter review rather than new material. Simple conditional logic.</p><p><strong>Smart Notifications:</strong> PWA push notifications via the Web Push API. Service worker handles the display. WordPress calculates what to send via WP-Cron: check due dates, check last review dates, generate weekly summary. Push payloads are small JSON objects. The PWA&#8217;s service worker is already part of the PWA architecture.</p><p><strong>Study Session Timer:</strong> Pure frontend. A React component with start/stop/pause. On stop, POST the session data to the API. No complex backend needed. The logged data enriches the learning dashboard.</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p><strong>Feasibility summary:</strong> Everything on the Keep and Modify lists is buildable with our stack. No exotic dependencies. The hardest part is the LLM integration &#8212; prompt engineering, managing API costs, and handling rate limits. I&#8217;d estimate 4-6 weeks for a solid MVP with Canvas sync, Socratic tutor, flashcards, and slide uploads. The modified features (streaks, mood, notifications, timer) add another 2 weeks.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Six to eight weeks total. That&#8217;s tight but doable if we&#8217;re disciplined.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>Can we do it in four?</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>No.</p></div></div>
+
+  <p class="stage">*Mike deflates slightly. Sensible pats him on the shoulder. They move to the final whiteboard.*</p>
+
+  <!-- ROUND 4 + 5 -->
+  <div class="round-header r4"><span class="round-num">Round 4</span>The Shortlist &#8212; All Three Agree</div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>OK. Let&#8217;s lock this in. Seven features for the Plato MVP. Priority order. All three of us have to agree.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>Can I at least name them cool things?</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>...Fine. But I&#8217;m naming the database tables.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Deal. Here&#8217;s the order we all agreed on:</p></div></div>
+
+  <div class="round-header r5"><span class="round-num">Round 5</span>The Shortlist + Scotty&#8217;s Quick Specs</div>
+
+  <div class="shortlist-item">
+    <div class="priority">P1 &#8212; Foundation</div>
+    <h3>&#x1F4E1; Canvas Sync Engine</h3>
+    <p class="desc">Plato connects to Canvas LMS and automatically pulls the student&#8217;s courses, assignments, due dates, and course enrolments. This is the data backbone &#8212; without it, Plato is flying blind. The student authenticates once via a personal access token, and Plato stays in sync.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>Student enters a Canvas personal access token in the PWA setup wizard. Token stored encrypted in WordPress <code>usermeta</code>. A WP-Cron job runs every 6 hours calling Canvas REST API endpoints: <code>/api/v1/courses</code>, <code>/api/v1/courses/:id/assignments</code>. Data normalised into <code>plato_courses</code> and <code>plato_assignments</code> tables. The PWA reads via <code>plato/v1/courses</code> and <code>plato/v1/assignments</code> endpoints. Fallback: manual course entry if Canvas API access is restricted by the institution.</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P2 &#8212; Core Loop</div>
+    <h3>&#x1F9E0; The Socratic Tutor (+ ELI5 Mode)</h3>
+    <p class="desc">The heart of Plato. When the student asks a question, Plato doesn&#8217;t just give the answer &#8212; it guides her to discover it herself through questioning, hints, and scaffolding. Adapts difficulty based on her mastery level. The ELI5 button re-explains any concept using simple everyday analogies.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>Chat interface in the PWA using a streaming response pattern (SSE or chunked transfer from the WP backend). Conversations stored in <code>plato_conversations</code> (id, user_id, course_id, topic) and <code>plato_messages</code> (conversation_id, role, content, timestamp). System prompt template includes student mastery level and course context pulled from <code>plato_study_notes</code>. LLM calls proxied through a new <code>class-llm.php</code> that abstracts the provider (OpenAI/Anthropic). ELI5 mode appends an instruction to the system prompt &#8212; same endpoint, different prompt modifier. Rate-limit to 50 messages/hour to manage costs.</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P3 &#8212; Content Pipeline</div>
+    <h3>&#x1F4DA; Slide &amp; Document Ingestion</h3>
+    <p class="desc">Upload lecture slides (PDF, PPTX) and Plato extracts, summarises, and indexes the content. This feeds every other AI feature &#8212; the tutor knows what was taught, the flashcard generator has source material, and the draft reviewer understands the course content deeply.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>File upload via the PWA (drag-and-drop zone, max 20MB). Files POST to <code>plato/v1/documents/upload</code>, stored in <code>wp-content/uploads/plato/</code>. A background processor (triggered by WP-Cron or <code>wp_schedule_single_event</code>) extracts text using <code>smalot/pdfparser</code> for PDF and <code>PhpOffice/PhpPresentation</code> for PPTX. Text chunked into ~1000-token segments, each sent to LLM for summarisation. Results stored in <code>plato_study_notes</code> (id, course_id, document_id, chunk_index, raw_text, summary, key_concepts_json). Key concepts extracted as structured JSON for flashcard generation.</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P4 &#8212; Retention</div>
+    <h3>&#x26A1; Smart Flashcards with Spaced Repetition</h3>
+    <p class="desc">Auto-generated flashcards from course content, served using the SM-2 spaced repetition algorithm. Cards appear at the optimal moment before the student would forget the concept. No manual card creation needed &#8212; Plato builds the deck from ingested materials.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>When documents are ingested (P3), a secondary LLM pass generates Q&amp;A pairs stored in <code>plato_flashcards</code> (id, course_id, document_id, question, answer, card_type). Review state in <code>plato_card_reviews</code> (card_id, user_id, ease_factor default 2.5, interval, repetitions, next_review_date). SM-2 algorithm implemented in <code>class-spaced-repetition.php</code>. PWA endpoint <code>plato/v1/flashcards/due</code> returns cards where <code>next_review_date &lt;= NOW()</code> ordered by priority. After review, PWA sends quality rating (0-5), backend recalculates schedule. Daily review session takes ~10-15 minutes.</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P5 &#8212; Assignments</div>
+    <h3>&#x1F4DD; Draft Reviewer</h3>
+    <p class="desc">Paste in an assignment draft and Plato reviews it against the rubric. Identifies gaps, weak arguments, missing rubric criteria, and structural issues. Never writes content &#8212; only gives actionable feedback. Like having a tutor available at 11pm on a Sunday night.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>New PWA page at <code>/review</code> with a text input (max 10,000 chars) and optional rubric input (pulled from Canvas if available, or manually entered). POST to <code>plato/v1/review/draft</code>. Backend constructs a prompt with rubric criteria and strict instructions to review-not-write. Response stored in <code>plato_draft_reviews</code> (id, user_id, assignment_id, draft_text_hash, feedback, rubric_criteria_json, created_at). Feedback is structured: overall assessment, per-criterion feedback, and top-3 improvement suggestions. Academic integrity guardrail enforced at the prompt level.</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P6 &#8212; Engagement</div>
+    <h3>&#x1F525; Study Streaks &amp; Session Tracking</h3>
+    <p class="desc">Simple but powerful motivation mechanics. Track study sessions, maintain daily streaks, log time per topic. Feeds the learning dashboard with real data about study habits. Includes a one-tap mood check before each session so Plato can adjust the study plan when she&#8217;s having a rough day.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>Study timer component in the PWA (React state, no external deps). On session end, POST to <code>plato/v1/sessions</code> with <code>{ course_id, topic, duration_minutes, mood_rating (1-5), session_type }</code>. Stored in <code>plato_study_sessions</code>. Streak calculated server-side: consecutive calendar days with at least one session. Exposed via <code>plato/v1/stats/streak</code>. Learning dashboard aggregates: total hours this week, hours per course, mastery progression, mood trend. If <code>mood_rating &lt;= 2</code>, the next flashcard session serves only review cards (no new material).</p>
+    </div>
+  </div>
+
+  <div class="shortlist-item">
+    <div class="priority">P7 &#8212; Nudges</div>
+    <h3>&#x1F514; Smart Notifications</h3>
+    <p class="desc">Three types only: assignment due reminders (3 days and 1 day before), retention decay alerts (&#8220;You haven&#8217;t reviewed Marketing in 9 days&#8221;), and a weekly study summary. Context-aware, respectful of attention, and genuinely helpful.</p>
+    <div class="tech-spec">
+      <div class="label">&#x1F527; Scotty&#8217;s Spec</div>
+      <p>PWA registers a service worker for Web Push API. User grants notification permission during onboarding. Push subscription stored in <code>plato_push_subscriptions</code> (user_id, endpoint, p256dh, auth). WP-Cron job runs daily at 8am checking: (1) assignments due within 3 days or 1 day, (2) flashcard decks with no review in 7+ days, (3) on Sundays, compile weekly summary. Notifications sent via <code>minishlink/web-push</code> PHP library. Payload is a small JSON object rendered by the service worker. User can configure quiet hours in PWA settings.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>Seven features! This is going to be INCREDIBLE. She&#8217;s going to ace every course. Plato is going to be the best tutor in the southern hemisphere!</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>Let&#8217;s not promise hemispheric domination. Let&#8217;s promise that she never misses a due date, always has study materials ready, and has a patient tutor available at 2am. That&#8217;s the real value.</p></div></div>
+
+  <div class="speech"><div class="avatar scotty">&#x1F527;</div><div class="bubble scotty"><div class="name">Scotty</div><p>Agreed. And from a build perspective &#8212; P1 through P3 are the foundation. They unlock P4 and P5. P6 and P7 are the engagement layer on top. Clean dependency chain. We build in order.</p></div></div>
+
+  <div class="speech"><div class="avatar mike">&#x1F680;</div><div class="bubble mike"><div class="name">Excitable Mike</div><p>And THEN we add the meme generator.</p></div></div>
+
+  <div class="speech"><div class="avatar sensible">&#x1F3AF;</div><div class="bubble sensible"><div class="name">Captain Sensible</div><p>...We&#8217;ll see, Mike. We&#8217;ll see.</p></div></div>
+
+  <p class="stage">*Session ends. Mike is already sketching memes on the whiteboard. Sensible is writing a project plan. Scotty has opened his laptop and is designing database schemas. The work begins.*</p>
+
+  <div style="text-align: center; margin-top: 60px; padding: 30px; border-top: 1px solid rgba(255,255,255,0.06); color: #555577; font-size: 0.85rem;">
+    <p><strong>Plato Brainstorm Session</strong> &#8212; February 2026</p>
+    <p>Excitable Mike &#x1F680; &#183; Captain Sensible &#x1F3AF; &#183; Scotty &#x1F527;</p>
+    <p style="margin-top: 8px; font-size: 0.78rem; color: #444466;">For a Torrens University student. Powered by WordPress + Next.js. Built with love and an unreasonable amount of coffee.</p>
+  </div>
+
+</div>
+</body>
+</html>
