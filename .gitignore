@@ -1,0 +1,28 @@
+# WordPress
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/cache/
+
+# Next.js
+pwa/node_modules/
+pwa/.next/
+pwa/.env
+pwa/.env.local
+
+# General
+.env
+.env.*
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Local by Flywheel
+app/sql/
+conf/
+logs/
