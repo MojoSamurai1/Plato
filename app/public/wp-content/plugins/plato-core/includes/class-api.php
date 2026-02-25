@@ -96,6 +96,25 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        // ─── Study Notes (P3: Document Ingestion) ─────────────────────────
+        register_rest_route( self::NAMESPACE, '/notes/upload', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'upload_note_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/notes', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_notes_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/notes/delete', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'delete_note_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Settings ──────────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/settings/llm', array(
             'methods'             => 'GET',
@@ -421,8 +440,11 @@ class Plato_API {
             Plato_Database::update_conversation_title( $conv_id, $auto_title );
         }
 
+        // Fetch study notes context for course.
+        $study_notes_context = $this->get_study_notes_context( $user_id, $conversation->course_id );
+
         // Call LLM.
-        $result = Plato_LLM::chat( $llm_messages, $conversation->mode, $course );
+        $result = Plato_LLM::chat( $llm_messages, $conversation->mode, $course, $study_notes_context );
         if ( is_wp_error( $result ) ) {
             return $result;
         }
@@ -512,7 +534,10 @@ class Plato_API {
 
         $provider = Plato_LLM::get_provider();
         $model    = Plato_LLM::get_model();
-        $system   = Plato_LLM::build_system_prompt( $conversation->mode, $course );
+
+        // Fetch study notes context for course.
+        $study_notes_context = $this->get_study_notes_context( $user_id, $conversation->course_id );
+        $system   = Plato_LLM::build_system_prompt( $conversation->mode, $course, $study_notes_context );
 
         // Disable output buffering, set SSE headers.
         while ( ob_get_level() ) {
@@ -637,6 +662,115 @@ class Plato_API {
         exit;
     }
 
+    // ─── Study Notes Handlers (P3) ─────────────────────────────────────────
+
+    public function upload_note_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'course_id' ) );
+        if ( ! $course_id ) {
+            return new WP_Error( 'plato_missing_course', 'course_id is required.', array( 'status' => 400 ) );
+        }
+
+        if ( empty( $_FILES['file'] ) ) {
+            return new WP_Error( 'plato_no_file', 'No file uploaded.', array( 'status' => 400 ) );
+        }
+
+        $file = $_FILES['file'];
+
+        // Validate.
+        $valid = Plato_Document_Processor::validate_file( $file );
+        if ( is_wp_error( $valid ) ) {
+            return $valid;
+        }
+
+        // Store file.
+        $relative_path = Plato_Document_Processor::store_file( $file, $user_id );
+        if ( is_wp_error( $relative_path ) ) {
+            return $relative_path;
+        }
+
+        $ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+
+        // Create initial study note row.
+        $note_id = Plato_Database::insert_study_note( array(
+            'user_id'      => $user_id,
+            'course_id'    => $course_id,
+            'file_name'    => sanitize_file_name( $file['name'] ),
+            'file_path'    => $relative_path,
+            'file_type'    => $ext,
+            'file_size'    => $file['size'],
+            'chunk_index'  => 0,
+            'total_chunks' => 0,
+            'status'       => 'pending',
+        ) );
+
+        if ( ! $note_id ) {
+            return new WP_Error( 'plato_insert_failed', 'Failed to create note record.', array( 'status' => 500 ) );
+        }
+
+        // For small files (< 2MB), process immediately inline.
+        $processing = false;
+        if ( $file['size'] < 2 * 1024 * 1024 ) {
+            Plato_Document_Processor::process_document( $note_id );
+            // Now summarize all pending chunks.
+            $pending = Plato_Database::get_pending_notes( 50 );
+            foreach ( $pending as $chunk ) {
+                Plato_Document_Processor::process_document( $chunk->id );
+            }
+            $processing = false;
+        } else {
+            // Schedule background processing.
+            wp_schedule_single_event( time() + 5, 'plato_process_documents' );
+            $processing = true;
+        }
+
+        $notes = Plato_Database::get_study_note_files( $user_id, $course_id );
+
+        return new WP_REST_Response( array(
+            'success'    => true,
+            'note_id'    => $note_id,
+            'processing' => $processing,
+            'notes'      => $notes,
+        ), 201 );
+    }
+
+    public function get_notes_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = $request->get_param( 'course_id' ) ? absint( $request->get_param( 'course_id' ) ) : null;
+        $notes     = Plato_Database::get_study_note_files( $user_id, $course_id );
+
+        return new WP_REST_Response( array(
+            'notes' => $notes,
+            'total' => count( $notes ),
+        ), 200 );
+    }
+
+    public function delete_note_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $file_name = sanitize_file_name( $request->get_param( 'file_name' ) ?? '' );
+        $course_id = absint( $request->get_param( 'course_id' ) );
+
+        if ( empty( $file_name ) || ! $course_id ) {
+            return new WP_Error( 'plato_missing_params', 'file_name and course_id are required.', array( 'status' => 400 ) );
+        }
+
+        Plato_Database::delete_study_note_file( $user_id, $file_name, $course_id );
+
+        return new WP_REST_Response( array( 'deleted' => true ), 200 );
+    }
+
     // ─── Settings Handlers ───────────────────────────────────────────────────
 
     public function get_llm_settings_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
@@ -683,5 +817,33 @@ class Plato_API {
 
     private function authenticate( WP_REST_Request $request ): int|WP_Error {
         return Plato_Auth::get_current_user_id();
+    }
+
+    /**
+     * Build study notes context string for LLM injection.
+     * Returns null if no notes exist or course_id is null.
+     */
+    private function get_study_notes_context( int $user_id, $course_id ): ?string {
+        if ( ! $course_id ) {
+            return null;
+        }
+
+        $summaries = Plato_Database::get_notes_summaries_for_course( $user_id, (int) $course_id );
+        if ( empty( $summaries ) ) {
+            return null;
+        }
+
+        $notes_text = '';
+        foreach ( $summaries as $s ) {
+            $notes_text .= $s->summary . "\n\n";
+        }
+
+        // Cap at ~4000 chars to avoid blowing up the context window.
+        $notes_text = trim( $notes_text );
+        if ( mb_strlen( $notes_text ) > 4000 ) {
+            $notes_text = mb_substr( $notes_text, 0, 4000 ) . "\n\n... (additional notes truncated)";
+        }
+
+        return $notes_text;
     }
 }

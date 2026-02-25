@@ -312,6 +312,71 @@ export const chat = {
   },
 };
 
+// ─── Study Notes (P3) ────────────────────────────────────────────────────────
+
+async function apiUpload<T>(endpoint: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  // DO NOT set Content-Type — browser sets multipart/form-data with boundary.
+
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
+    throw new ApiError('Unauthorized', 401);
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message || `Request failed (${res.status})`, res.status);
+  }
+
+  return res.json();
+}
+
+export interface StudyNote {
+  file_name: string;
+  course_id: number;
+  course_name: string;
+  course_code: string;
+  file_type: string;
+  file_size: number;
+  total_chunks: number;
+  completed_chunks: number;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  error_message: string | null;
+  created_at: string;
+}
+
+export const notes = {
+  list(courseId?: number): Promise<{ notes: StudyNote[]; total: number }> {
+    const qs = courseId ? `?course_id=${courseId}` : '';
+    return apiFetch(`/notes${qs}`);
+  },
+  upload(file: File, courseId: number): Promise<{ success: boolean; note_id: number; processing: boolean; notes: StudyNote[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('course_id', String(courseId));
+    return apiUpload('/notes/upload', formData);
+  },
+  delete(fileName: string, courseId: number): Promise<{ deleted: boolean }> {
+    return apiFetch('/notes/delete', {
+      method: 'POST',
+      body: JSON.stringify({ file_name: fileName, course_id: courseId }),
+    });
+  },
+};
+
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 export interface LLMSettings {

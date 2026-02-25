@@ -63,7 +63,7 @@ class Plato_LLM {
 
     // ─── System Prompt ───────────────────────────────────────────────────────
 
-    public static function build_system_prompt( string $mode, ?object $course = null ): string {
+    public static function build_system_prompt( string $mode, ?object $course = null, ?string $study_notes_context = null ): string {
         $base = "You are Plato, a warm, encouraging AI tutor. You help university students understand their course material deeply.";
 
         if ( $mode === 'eli5' ) {
@@ -89,6 +89,13 @@ class Plato_LLM {
                     . "\n- Tailor your explanations to this course's subject area.";
         }
 
+        if ( $study_notes_context ) {
+            $base .= "\n\nSTUDY NOTES FROM COURSE MATERIALS:"
+                    . "\nThe student has uploaded lecture slides/documents for this course. "
+                    . "Use the following extracted study notes to provide accurate, course-specific guidance:\n\n"
+                    . $study_notes_context;
+        }
+
         return $base;
     }
 
@@ -102,7 +109,7 @@ class Plato_LLM {
      * @param object|null $course Course context object.
      * @return array|WP_Error { content: string, tokens_used: int }
      */
-    public static function chat( array $messages, string $mode = 'socratic', ?object $course = null ): array|WP_Error {
+    public static function chat( array $messages, string $mode = 'socratic', ?object $course = null, ?string $study_notes_context = null ): array|WP_Error {
         $api_key = self::get_api_key();
         if ( ! $api_key ) {
             return new WP_Error( 'plato_llm_not_configured', 'LLM API key not configured. Go to Settings to add one.', array( 'status' => 400 ) );
@@ -110,7 +117,7 @@ class Plato_LLM {
 
         $provider = self::get_provider();
         $model    = self::get_model();
-        $system   = self::build_system_prompt( $mode, $course );
+        $system   = self::build_system_prompt( $mode, $course, $study_notes_context );
 
         if ( $provider === self::PROVIDER_ANTHROPIC ) {
             return self::call_anthropic( $api_key, $model, $system, $messages );
@@ -352,6 +359,37 @@ class Plato_LLM {
 
         curl_close( $ch );
         exit;
+    }
+
+    // ─── Summarization (P3: Document Ingestion) ─────────────────────────────
+
+    /**
+     * Summarize a chunk of document text into study notes.
+     *
+     * @param string $content    The raw text chunk.
+     * @param string $course_name Course name for context.
+     * @return array|WP_Error { content: string, tokens_used: int }
+     */
+    public static function summarize( string $content, string $course_name ): array|WP_Error {
+        $api_key = self::get_api_key();
+        if ( ! $api_key ) {
+            return new WP_Error( 'plato_llm_not_configured', 'LLM API key not configured.' );
+        }
+
+        $system = "You are a study notes summarizer. Summarize the following lecture content into concise, well-structured study notes. "
+                . "Focus on key concepts, definitions, formulas, and important points. "
+                . "Course: {$course_name}. Keep it under 200 words. Use bullet points where helpful.";
+
+        $messages = array( array( 'role' => 'user', 'content' => $content ) );
+
+        $provider = self::get_provider();
+        $model    = self::get_model();
+
+        if ( $provider === self::PROVIDER_ANTHROPIC ) {
+            return self::call_anthropic( $api_key, $model, $system, $messages );
+        }
+
+        return self::call_openai( $api_key, $model, $system, $messages );
     }
 
     // ─── SSE Helpers ─────────────────────────────────────────────────────────

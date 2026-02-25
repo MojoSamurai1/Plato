@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PLATO_VERSION', '1.1.0' );
+define( 'PLATO_VERSION', '1.2.0' );
 define( 'PLATO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLATO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -20,12 +20,19 @@ function plato_get_encryption_key(): string {
     return defined( 'AUTH_KEY' ) ? AUTH_KEY : 'plato-fallback-key-change-me';
 }
 
+// ─── Composer Autoload ───────────────────────────────────────────────────────
+
+if ( file_exists( PLATO_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
+    require_once PLATO_PLUGIN_DIR . 'vendor/autoload.php';
+}
+
 // ─── Class Loader ────────────────────────────────────────────────────────────
 
 require_once PLATO_PLUGIN_DIR . 'includes/class-database.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-auth.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-canvas.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-llm.php';
+require_once PLATO_PLUGIN_DIR . 'includes/class-document-processor.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-api.php';
 
 // ─── Activation ──────────────────────────────────────────────────────────────
@@ -131,6 +138,24 @@ function plato_run_canvas_sync(): void {
     }
 }
 
+// ─── WP-Cron: Document Processing (P3) ──────────────────────────────────────
+
+add_action( 'plato_process_documents', 'plato_run_document_processing' );
+
+function plato_run_document_processing(): void {
+    $pending = Plato_Database::get_pending_notes( 10 );
+    foreach ( $pending as $note ) {
+        Plato_Document_Processor::process_document( $note->id );
+        sleep( 2 ); // Rate-limit between LLM summarization calls.
+    }
+
+    // If more pending, schedule another run.
+    $remaining = Plato_Database::get_pending_notes( 1 );
+    if ( ! empty( $remaining ) ) {
+        wp_schedule_single_event( time() + 10, 'plato_process_documents' );
+    }
+}
+
 // ─── Encryption Helpers ──────────────────────────────────────────────────────
 
 function plato_encrypt( string $plain_text ): string {
@@ -160,4 +185,5 @@ function plato_decrypt( string $encrypted_text ): string|false {
 
 register_deactivation_hook( __FILE__, function () {
     wp_clear_scheduled_hook( 'plato_canvas_sync' );
+    wp_clear_scheduled_hook( 'plato_process_documents' );
 } );

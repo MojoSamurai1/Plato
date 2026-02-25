@@ -6,6 +6,11 @@ app/public/wp-content/*
 app/public/wp-content/plugins/*
 !app/public/wp-content/plugins/plato-core/
 
+# Composer (inside plugin)
+app/public/wp-content/plugins/plato-core/vendor/
+app/public/wp-content/plugins/plato-core/composer.phar
+app/public/wp-content/plugins/plato-core/composer.lock
+
 # WordPress config & generated
 wp-config.php
 wp-content/uploads/

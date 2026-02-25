@@ -1,0 +1,12 @@
+{
+    "name": "plato/plato-core",
+    "description": "Plato AI Tutor - Document processing dependencies",
+    "type": "wordpress-plugin",
+    "require": {
+        "smalot/pdfparser": "^2.0",
+        "phpoffice/phppresentation": "^1.0"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

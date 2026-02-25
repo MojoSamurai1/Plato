@@ -62,6 +62,29 @@ class Plato_Database {
             KEY             conversation_id (conversation_id)
         ) $charset_collate;
 
+        CREATE TABLE {$wpdb->prefix}plato_study_notes (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            course_id       BIGINT UNSIGNED NOT NULL,
+            file_name       VARCHAR(255)    NOT NULL DEFAULT '',
+            file_path       VARCHAR(500)    NOT NULL DEFAULT '',
+            file_type       VARCHAR(20)     NOT NULL DEFAULT '',
+            file_size       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            chunk_index     INT UNSIGNED    NOT NULL DEFAULT 0,
+            total_chunks    INT UNSIGNED    NOT NULL DEFAULT 0,
+            content         LONGTEXT                 DEFAULT NULL,
+            summary         LONGTEXT                 DEFAULT NULL,
+            status          VARCHAR(20)     NOT NULL DEFAULT 'pending',
+            error_message   VARCHAR(500)             DEFAULT NULL,
+            processed_at    DATETIME                 DEFAULT NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            KEY             user_course (user_id, course_id),
+            KEY             status (status),
+            KEY             file_lookup (user_id, file_name, chunk_index)
+        ) $charset_collate;
+
         CREATE TABLE {$wpdb->prefix}plato_assignments (
             id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id              BIGINT UNSIGNED NOT NULL,
@@ -348,6 +371,140 @@ class Plato_Database {
              WHERE cv.user_id = %d AND m.role = 'user' AND m.created_at >= %s",
             $user_id,
             gmdate( 'Y-m-d H:i:s', time() - 3600 )
+        ) );
+    }
+
+    // ─── Study Notes CRUD (P3: Document Ingestion) ──────────────────────────
+
+    public static function insert_study_note( array $data ): int|false {
+        global $wpdb;
+        $result = $wpdb->insert( $wpdb->prefix . 'plato_study_notes', $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    public static function update_study_note( int $id, array $data ): bool {
+        global $wpdb;
+        $data['updated_at'] = current_time( 'mysql', true );
+        return $wpdb->update( $wpdb->prefix . 'plato_study_notes', $data, array( 'id' => $id ) ) !== false;
+    }
+
+    public static function get_study_note( int $id ): object|null {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+        return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+    }
+
+    /**
+     * Get all uploaded files for a user, grouped by file_name.
+     * Returns one row per file with aggregated status info.
+     */
+    public static function get_study_note_files( int $user_id, ?int $course_id = null ): array {
+        global $wpdb;
+        $table   = $wpdb->prefix . 'plato_study_notes';
+        $courses = $wpdb->prefix . 'plato_courses';
+
+        $where  = array( 'n.user_id = %d' );
+        $params = array( $user_id );
+
+        if ( $course_id ) {
+            $where[]  = 'n.course_id = %d';
+            $params[] = $course_id;
+        }
+
+        $where_clause = implode( ' AND ', $where );
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT n.file_name, n.course_id, c.name AS course_name, c.course_code,
+                    n.file_type, MAX(n.file_size) AS file_size,
+                    MAX(n.total_chunks) AS total_chunks,
+                    SUM(CASE WHEN n.status = 'completed' THEN 1 ELSE 0 END) AS completed_chunks,
+                    MIN(n.status) AS status,
+                    MAX(n.error_message) AS error_message,
+                    MIN(n.created_at) AS created_at
+             FROM $table n
+             INNER JOIN $courses c ON c.id = n.course_id
+             WHERE $where_clause
+             GROUP BY n.file_name, n.course_id
+             ORDER BY MIN(n.created_at) DESC",
+            $params
+        ) );
+    }
+
+    /**
+     * Get pending study note chunks for background processing.
+     */
+    public static function get_pending_notes( int $limit = 10 ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table WHERE status = 'pending' ORDER BY created_at ASC LIMIT %d",
+            $limit
+        ) );
+    }
+
+    /**
+     * Get concatenated summaries for a course — used for LLM context injection.
+     */
+    public static function get_notes_summaries_for_course( int $user_id, int $course_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT summary FROM $table
+             WHERE user_id = %d AND course_id = %d AND status = 'completed' AND summary IS NOT NULL
+             ORDER BY file_name ASC, chunk_index ASC",
+            $user_id,
+            $course_id
+        ) );
+    }
+
+    /**
+     * Delete all chunks for a given file + course.
+     */
+    public static function delete_study_note_file( int $user_id, string $file_name, int $course_id ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+
+        // Get file_path before deleting (from chunk 0).
+        $file_path = $wpdb->get_var( $wpdb->prepare(
+            "SELECT file_path FROM $table WHERE user_id = %d AND file_name = %s AND course_id = %d AND chunk_index = 0",
+            $user_id,
+            $file_name,
+            $course_id
+        ) );
+
+        // Delete all chunks.
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM $table WHERE user_id = %d AND file_name = %s AND course_id = %d",
+            $user_id,
+            $file_name,
+            $course_id
+        ) );
+
+        // Delete physical file.
+        if ( $file_path ) {
+            $upload_dir = wp_upload_dir();
+            $full_path  = $upload_dir['basedir'] . '/' . $file_path;
+            if ( file_exists( $full_path ) ) {
+                wp_delete_file( $full_path );
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Count notes for a course (for chat indicator).
+     */
+    public static function count_notes_for_course( int $user_id, int $course_id ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+
+        return (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(DISTINCT file_name) FROM $table WHERE user_id = %d AND course_id = %d",
+            $user_id,
+            $course_id
         ) );
     }
 }
