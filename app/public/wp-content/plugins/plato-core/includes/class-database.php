@@ -85,6 +85,22 @@ class Plato_Database {
             KEY             file_lookup (user_id, file_name, chunk_index)
         ) $charset_collate;
 
+        CREATE TABLE {$wpdb->prefix}plato_canvas_content (
+            id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id           BIGINT UNSIGNED NOT NULL,
+            canvas_course_id  BIGINT UNSIGNED NOT NULL,
+            plato_course_id   BIGINT UNSIGNED NOT NULL,
+            content_key       VARCHAR(500)    NOT NULL DEFAULT '',
+            content_type      VARCHAR(50)     NOT NULL DEFAULT 'page',
+            title             VARCHAR(255)    NOT NULL DEFAULT '',
+            module_name       VARCHAR(255)    NOT NULL DEFAULT '',
+            chunks_created    INT UNSIGNED    NOT NULL DEFAULT 0,
+            synced_at         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY       (id),
+            UNIQUE KEY        user_content (user_id, content_key(191)),
+            KEY               user_course (user_id, canvas_course_id)
+        ) $charset_collate;
+
         CREATE TABLE {$wpdb->prefix}plato_assignments (
             id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id              BIGINT UNSIGNED NOT NULL,
@@ -506,5 +522,53 @@ class Plato_Database {
             $user_id,
             $course_id
         ) );
+    }
+
+    // ─── Canvas Content Tracking ────────────────────────────────────────
+
+    /**
+     * Check if a Canvas content item has already been synced.
+     */
+    public static function canvas_content_exists( int $user_id, string $content_key ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_content';
+
+        return (bool) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM $table WHERE user_id = %d AND content_key = %s",
+            $user_id,
+            $content_key
+        ) );
+    }
+
+    /**
+     * Insert a canvas content tracking record.
+     */
+    public static function insert_canvas_content( array $data ): int|false {
+        global $wpdb;
+        $result = $wpdb->insert( $wpdb->prefix . 'plato_canvas_content', $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    /**
+     * Get content sync stats for a user.
+     */
+    public static function get_canvas_content_stats( int $user_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_content';
+
+        $total = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE user_id = %d",
+            $user_id
+        ) );
+
+        $total_chunks = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(chunks_created), 0) FROM $table WHERE user_id = %d",
+            $user_id
+        ) );
+
+        return array(
+            'pages_synced'  => $total,
+            'total_chunks'  => $total_chunks,
+        );
     }
 }

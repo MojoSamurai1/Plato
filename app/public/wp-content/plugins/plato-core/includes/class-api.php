@@ -46,6 +46,12 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        register_rest_route( self::NAMESPACE, '/canvas/content-sync', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'canvas_content_sync_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Data ───────────────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/courses', array(
             'methods'             => 'GET',
@@ -255,10 +261,54 @@ class Plato_API {
 
         $canvas = new Plato_Canvas( $user_id );
 
+        $content_stats = Plato_Database::get_canvas_content_stats( $user_id );
+
         return new WP_REST_Response( array(
-            'connected' => $canvas->has_token(),
-            'hint'      => get_user_meta( $user_id, Plato_Canvas::TOKEN_HINT_META_KEY, true ) ?: null,
-            'sync'      => $canvas->get_sync_status(),
+            'connected'    => $canvas->has_token(),
+            'hint'         => get_user_meta( $user_id, Plato_Canvas::TOKEN_HINT_META_KEY, true ) ?: null,
+            'sync'         => $canvas->get_sync_status(),
+            'content_sync' => array(
+                'pages_synced'    => $content_stats['pages_synced'],
+                'total_chunks'    => $content_stats['total_chunks'],
+                'last_sync'       => get_user_meta( $user_id, 'plato_content_last_sync', true ) ?: null,
+            ),
+        ), 200 );
+    }
+
+    public function canvas_content_sync_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $canvas = new Plato_Canvas( $user_id );
+        if ( ! $canvas->has_token() ) {
+            return new WP_Error(
+                'plato_no_canvas_token',
+                'No Canvas token stored. Connect Canvas first.',
+                array( 'status' => 400 )
+            );
+        }
+
+        // Increase time limit — content sync fetches many pages.
+        set_time_limit( 300 );
+
+        $result = $canvas->sync_content();
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        $stats = Plato_Database::get_canvas_content_stats( $user_id );
+
+        return new WP_REST_Response( array(
+            'success'        => true,
+            'pages_synced'   => $result['pages_synced'],
+            'pages_skipped'  => $result['pages_skipped'],
+            'total_pages'    => $stats['pages_synced'],
+            'total_chunks'   => $stats['total_chunks'],
+            'message'        => $result['pages_synced'] > 0
+                ? sprintf( '%d new pages ingested (%d already synced). Background summarization scheduled.', $result['pages_synced'], $result['pages_skipped'] )
+                : 'All Canvas content is already synced.',
         ), 200 );
     }
 

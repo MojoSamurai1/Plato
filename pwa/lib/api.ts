@@ -98,6 +98,20 @@ interface CanvasStatusResponse {
     last_sync: string | null;
     error: string | null;
   };
+  content_sync: {
+    pages_synced: number;
+    total_chunks: number;
+    last_sync: string | null;
+  };
+}
+
+interface ContentSyncResponse {
+  success: boolean;
+  pages_synced: number;
+  pages_skipped: number;
+  total_pages: number;
+  total_chunks: number;
+  message: string;
 }
 
 export const canvas = {
@@ -112,6 +126,9 @@ export const canvas = {
   },
   status(): Promise<CanvasStatusResponse> {
     return apiFetch('/canvas/status');
+  },
+  contentSync(): Promise<ContentSyncResponse> {
+    return apiFetch('/canvas/content-sync', { method: 'POST' });
   },
 };
 

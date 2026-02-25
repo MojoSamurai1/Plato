@@ -261,4 +261,201 @@ class Plato_Canvas {
         $timestamp = strtotime( $iso_date );
         return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : null;
     }
+
+    // ─── Content Sync (P3+: Auto-ingest Canvas pages) ─────────────────────
+
+    /**
+     * Sync course content: fetch modules → items → pages → inject as study notes.
+     *
+     * @return array|WP_Error { pages_synced: int, pages_skipped: int }
+     */
+    public function sync_content(): array|WP_Error {
+        $token = $this->get_token();
+        if ( ! $token ) {
+            return new WP_Error( 'plato_no_canvas_token', 'No Canvas token stored.', array( 'status' => 400 ) );
+        }
+
+        // Get user's courses from our DB.
+        $courses = Plato_Database::get_courses_for_user( $this->user_id );
+        if ( empty( $courses ) ) {
+            return new WP_Error( 'plato_no_courses', 'No courses synced yet. Run Canvas sync first.', array( 'status' => 400 ) );
+        }
+
+        $pages_synced  = 0;
+        $pages_skipped = 0;
+
+        foreach ( $courses as $course ) {
+            $canvas_course_id = (int) $course->canvas_course_id;
+            $plato_course_id  = (int) $course->id;
+
+            // Fetch modules for this course.
+            $modules = $this->fetch_modules( $token, $canvas_course_id );
+            if ( is_wp_error( $modules ) ) {
+                continue; // Skip course on error, don't fail entire sync.
+            }
+
+            foreach ( $modules as $module ) {
+                $module_name = $module['name'] ?? 'Unknown Module';
+
+                // Fetch items in this module.
+                $items = $this->fetch_module_items( $token, $canvas_course_id, (int) $module['id'] );
+                if ( is_wp_error( $items ) ) {
+                    continue;
+                }
+
+                foreach ( $items as $item ) {
+                    // Only process Page items (most common content type).
+                    if ( ( $item['type'] ?? '' ) !== 'Page' ) {
+                        continue;
+                    }
+
+                    $page_url = $item['page_url'] ?? '';
+                    if ( empty( $page_url ) ) {
+                        continue;
+                    }
+
+                    // Check if we already synced this page.
+                    $content_key = "page:{$canvas_course_id}:{$page_url}";
+                    if ( Plato_Database::canvas_content_exists( $this->user_id, $content_key ) ) {
+                        $pages_skipped++;
+                        continue;
+                    }
+
+                    // Fetch the page body.
+                    $page = $this->fetch_page_content( $token, $canvas_course_id, $page_url );
+                    if ( is_wp_error( $page ) ) {
+                        continue;
+                    }
+
+                    $html  = $page['body'] ?? '';
+                    $title = $page['title'] ?? $item['title'] ?? 'Untitled';
+
+                    // Strip HTML to plain text.
+                    $text = self::strip_html_to_text( $html );
+                    if ( mb_strlen( $text ) < 50 ) {
+                        $pages_skipped++;
+                        continue; // Skip near-empty pages.
+                    }
+
+                    // Build a file_name for the study note.
+                    $file_name = "canvas-{$module_name}-{$title}";
+                    $file_name = sanitize_file_name( $file_name );
+
+                    // Chunk the text and insert as study notes.
+                    $chunks       = Plato_Document_Processor::chunk_text( $text );
+                    $total_chunks = count( $chunks );
+
+                    foreach ( $chunks as $i => $chunk ) {
+                        Plato_Database::insert_study_note( array(
+                            'user_id'      => $this->user_id,
+                            'course_id'    => $plato_course_id,
+                            'file_name'    => $file_name,
+                            'file_path'    => '', // No physical file for Canvas pages.
+                            'file_type'    => 'canvas',
+                            'file_size'    => mb_strlen( $text ),
+                            'chunk_index'  => $i,
+                            'total_chunks' => $total_chunks,
+                            'content'      => $chunk,
+                            'status'       => 'pending',
+                        ) );
+                    }
+
+                    // Record that we synced this content.
+                    Plato_Database::insert_canvas_content( array(
+                        'user_id'           => $this->user_id,
+                        'canvas_course_id'  => $canvas_course_id,
+                        'plato_course_id'   => $plato_course_id,
+                        'content_key'       => $content_key,
+                        'content_type'      => 'page',
+                        'title'             => mb_substr( $title, 0, 255 ),
+                        'module_name'       => mb_substr( $module_name, 0, 255 ),
+                        'chunks_created'    => $total_chunks,
+                    ) );
+
+                    $pages_synced++;
+                }
+            }
+        }
+
+        // If we created new chunks, schedule background summarization.
+        if ( $pages_synced > 0 ) {
+            wp_schedule_single_event( time() + 5, 'plato_process_documents' );
+        }
+
+        // Update content sync timestamp.
+        update_user_meta( $this->user_id, 'plato_content_last_sync', current_time( 'mysql', true ) );
+
+        return array(
+            'pages_synced'  => $pages_synced,
+            'pages_skipped' => $pages_skipped,
+        );
+    }
+
+    // ─── Canvas Content API Calls ─────────────────────────────────────────
+
+    private function fetch_modules( string $token, int $canvas_course_id ): array|WP_Error {
+        return $this->fetch_all_pages(
+            $token,
+            "/courses/$canvas_course_id/modules",
+            array( 'per_page' => 50 )
+        );
+    }
+
+    private function fetch_module_items( string $token, int $canvas_course_id, int $module_id ): array|WP_Error {
+        return $this->fetch_all_pages(
+            $token,
+            "/courses/$canvas_course_id/modules/$module_id/items",
+            array( 'per_page' => 50 )
+        );
+    }
+
+    private function fetch_page_content( string $token, int $canvas_course_id, string $page_url ): array|WP_Error {
+        $url      = self::CANVAS_BASE_URL . "/courses/$canvas_course_id/pages/" . urlencode( $page_url );
+        $response = $this->make_request( $token, $url );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( ! is_array( $body ) ) {
+            return new WP_Error( 'plato_canvas_parse_error', 'Failed to parse page response.' );
+        }
+
+        return $body;
+    }
+
+    // ─── HTML Stripping ───────────────────────────────────────────────────
+
+    /**
+     * Convert HTML to clean plain text suitable for LLM processing.
+     */
+    public static function strip_html_to_text( string $html ): string {
+        // Remove script and style tags completely.
+        $html = preg_replace( '/<script[^>]*>.*?<\/script>/is', '', $html );
+        $html = preg_replace( '/<style[^>]*>.*?<\/style>/is', '', $html );
+        $html = preg_replace( '/<link[^>]*>/is', '', $html );
+
+        // Convert headings to text with markers.
+        $html = preg_replace( '/<h[1-6][^>]*>(.*?)<\/h[1-6]>/is', "\n## $1\n", $html );
+
+        // Convert list items.
+        $html = preg_replace( '/<li[^>]*>/i', "\n- ", $html );
+
+        // Convert paragraph and div breaks.
+        $html = preg_replace( '/<\/(p|div|tr)>/i', "\n", $html );
+        $html = preg_replace( '/<br\s*\/?>/i', "\n", $html );
+
+        // Strip all remaining tags.
+        $text = wp_strip_all_tags( $html );
+
+        // Decode HTML entities.
+        $text = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
+
+        // Clean up whitespace: collapse multiple blank lines.
+        $text = preg_replace( '/\n{3,}/', "\n\n", $text );
+        $text = preg_replace( '/[ \t]+/', ' ', $text );
+
+        return trim( $text );
+    }
 }

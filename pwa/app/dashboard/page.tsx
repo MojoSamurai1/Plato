@@ -19,6 +19,10 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [contentSyncing, setContentSyncing] = useState(false);
+  const [contentSyncMsg, setContentSyncMsg] = useState('');
+  const [contentPages, setContentPages] = useState(0);
+  const [contentLastSync, setContentLastSync] = useState<string | null>(null);
 
   async function loadData() {
     try {
@@ -33,6 +37,10 @@ function DashboardContent() {
       setSyncStatus(coursesRes.sync_status);
       setLastSync(coursesRes.last_sync);
       setConnected(statusRes.connected);
+      if (statusRes.content_sync) {
+        setContentPages(statusRes.content_sync.pages_synced);
+        setContentLastSync(statusRes.content_sync.last_sync);
+      }
     } catch {
       // 401 is handled by api.ts auto-redirect
     } finally {
@@ -53,6 +61,21 @@ function DashboardContent() {
       // handled
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleContentSync() {
+    setContentSyncing(true);
+    setContentSyncMsg('');
+    try {
+      const res = await canvas.contentSync();
+      setContentSyncMsg(res.message);
+      setContentPages(res.total_pages);
+      setContentLastSync(new Date().toISOString());
+    } catch (err) {
+      setContentSyncMsg(err instanceof Error ? err.message : 'Content sync failed');
+    } finally {
+      setContentSyncing(false);
     }
   }
 
@@ -142,6 +165,41 @@ function DashboardContent() {
               hour: '2-digit',
               minute: '2-digit',
             })}
+          </div>
+        )}
+
+        {/* Canvas Content Sync */}
+        {connected && (
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Course Content
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {contentPages > 0
+                    ? `${contentPages} Canvas pages ingested`
+                    : 'Pull lecture content from Canvas so Plato knows your course material'}
+                  {contentLastSync &&
+                    ` · Last sync: ${new Date(contentLastSync).toLocaleDateString('en-AU', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}`}
+                </p>
+              </div>
+              <button
+                onClick={handleContentSync}
+                disabled={contentSyncing}
+                className="text-sm bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 disabled:opacity-50 px-3 py-1.5 rounded-lg transition font-medium"
+              >
+                {contentSyncing ? 'Syncing...' : contentPages > 0 ? 'Sync New Content' : 'Sync Course Content'}
+              </button>
+            </div>
+            {contentSyncMsg && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                {contentSyncMsg}
+              </p>
+            )}
           </div>
         )}
 

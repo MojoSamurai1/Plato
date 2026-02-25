@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PLATO_VERSION', '1.2.0' );
+define( 'PLATO_VERSION', '1.3.0' );
 define( 'PLATO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLATO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -135,6 +135,9 @@ function plato_run_canvas_sync(): void {
     foreach ( $users as $user_id ) {
         $canvas = new Plato_Canvas( (int) $user_id );
         $canvas->sync_all();
+
+        // Also sync course content (modules/pages) into study notes.
+        $canvas->sync_content();
     }
 }
 
