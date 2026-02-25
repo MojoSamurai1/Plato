@@ -3,6 +3,12 @@ wp-config.php
 wp-content/uploads/
 wp-content/upgrade/
 wp-content/cache/
+wp-content/et-cache/
+wp-content/jetpack-waf/
+
+# SiteGround specific
+sgo-config.php
+sgs_encrypt_key.php
 
 # Next.js
 pwa/node_modules/
@@ -26,3 +32,4 @@ Thumbs.db
 app/sql/
 conf/
 logs/
+app/public/local-xdebuginfo.php

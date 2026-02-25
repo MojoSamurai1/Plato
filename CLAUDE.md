@@ -50,7 +50,8 @@ JWT-based. WordPress issues tokens stored in `localStorage`. All authenticated A
 ### REST API Base
 
 - Local: `http://plato.local/wp-json/plato/v1`
-- Production: TBD
+- Staging: `https://staging.plato.mywinemojo.com/wp-json/plato/v1`
+- Production: `https://plato.mywinemojo.com/wp-json/plato/v1`
 - Configured via `NEXT_PUBLIC_API_URL` env var
 
 ### CORS
@@ -76,12 +77,28 @@ Allowed origins are configured in the plugin entry file. Adding a new origin req
 
 ## Deployment
 
-GitHub Actions (`.github/workflows/deploy.yml`) deploys via SSH + rsync to SiteGround:
-- Push to `main` deploys to production
-- Push to `staging` deploys to staging
-- Excludes: `.git`, `node_modules`, `.env`, `wp-config.php`, `wp-content/uploads/`
+### Hosting
+- **SiteGround** (mywinemojo.com account, user `u2564-pl4p2h1iuqgu`)
+- **Production URL**: `plato.mywinemojo.com`
+- **Staging URL**: `staging.plato.mywinemojo.com`
+- **SSH Host**: `ssh.mywinemojo.com` (port 18765)
+- **SSH Key**: `~/.ssh/mojo-microsoft-ai-deploy-key` (same as MyWineMojo account - shared via `Mojo Wine Private Key`)
 
-Required GitHub secrets: `SSH_PRIVATE_KEY`, `SSH_HOST`, `SSH_USER`, `SSH_PORT`, `DEPLOY_PATH_PROD`, `DEPLOY_PATH_STAGING`
+### GitHub Actions
+- `.github/workflows/deploy-production.yml` — Push to `main` deploys to production
+- `.github/workflows/deploy-staging.yml` — Push to `staging` deploys to staging
+- Method: `webfactory/ssh-agent@v0.9.0` + `rsync --delete`
+- Excludes: `.git`, `.github`, `.claude`, `node_modules`, `.env`, `wp-config.php`, `wp-content/uploads/`, `wp-content/cache/`
+
+### GitHub Secrets (MojoSamurai1/Plato)
+| Secret | Description |
+|--------|-------------|
+| `STAGING_SSH_KEY` / `PROD_SSH_KEY` | Private SSH key (Mojo Wine Private Key) |
+| `STAGING_SSH_HOST` / `PROD_SSH_HOST` | `ssh.mywinemojo.com` |
+| `STAGING_SSH_USER` / `PROD_SSH_USER` | `u2564-pl4p2h1iuqgu` |
+| `STAGING_SSH_PORT` / `PROD_SSH_PORT` | `18765` |
+| `STAGING_DEPLOY_PATH` | `/home/u2564-pl4p2h1iuqgu/www/staging.plato.mywinemojo.com/public_html` |
+| `PROD_DEPLOY_PATH` | `/home/u2564-pl4p2h1iuqgu/www/plato.mywinemojo.com/public_html` |
 
 ## Key Files for Common Tasks
 

@@ -1,0 +1,41 @@
+name: Deploy to Production
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.PROD_SSH_PORT }} ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy plugin to Production
+        run: |
+          rsync -rlgoDzvc --delete \
+            -e "ssh -p ${{ secrets.PROD_SSH_PORT }}" \
+            app/public/wp-content/plugins/plato-core/ \
+            ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/wp-content/plugins/plato-core/
+
+      - name: Deploy theme to Production
+        run: |
+          if [ -d "app/public/wp-content/themes/plato" ]; then
+            rsync -rlgoDzvc --delete \
+              -e "ssh -p ${{ secrets.PROD_SSH_PORT }}" \
+              app/public/wp-content/themes/plato/ \
+              ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${{ secrets.PROD_DEPLOY_PATH }}/wp-content/themes/plato/
+          fi
+
+      - name: Deployment Complete
+        run: |
+          echo "Deployed to production"
+          echo "Commit: ${{ github.sha }}"
