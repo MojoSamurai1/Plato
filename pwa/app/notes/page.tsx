@@ -201,7 +201,7 @@ function NotesContent() {
               : 'Drop a PDF or PPTX here, or click to browse'}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            Max 20 MB. Lecture slides, handouts, or notes.
+            Max 50 MB. Lecture slides, handouts, or notes.
           </p>
           {!selectedCourse && (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">

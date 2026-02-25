@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Plato_Document_Processor {
 
-    const MAX_FILE_SIZE      = 20 * 1024 * 1024; // 20 MB
+    const MAX_FILE_SIZE      = 50 * 1024 * 1024; // 50 MB
     const ALLOWED_EXTENSIONS = array( 'pdf', 'pptx' );
     const ALLOWED_MIMES      = array(
         'application/pdf',
@@ -27,8 +27,14 @@ class Plato_Document_Processor {
             return new WP_Error( 'plato_no_file', 'No file uploaded.', array( 'status' => 400 ) );
         }
 
+        // Check PHP upload error codes first.
+        if ( ! empty( $file['error'] ) && $file['error'] !== UPLOAD_ERR_OK ) {
+            $php_max = ini_get( 'upload_max_filesize' );
+            return new WP_Error( 'plato_php_upload_error', "Upload failed (PHP limit: {$php_max}). Try a smaller file.", array( 'status' => 400 ) );
+        }
+
         if ( $file['size'] > self::MAX_FILE_SIZE ) {
-            return new WP_Error( 'plato_file_too_large', 'File must be under 20 MB.', array( 'status' => 400 ) );
+            return new WP_Error( 'plato_file_too_large', 'File must be under 50 MB.', array( 'status' => 400 ) );
         }
 
         $ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );

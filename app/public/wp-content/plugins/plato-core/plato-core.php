@@ -35,6 +35,17 @@ require_once PLATO_PLUGIN_DIR . 'includes/class-llm.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-document-processor.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-api.php';
 
+// ─── PHP Upload Limits ──────────────────────────────────────────────────────
+// Raise PHP limits so lecture slides (often 30-50 MB) can be uploaded.
+@ini_set( 'upload_max_filesize', '64M' );
+@ini_set( 'post_max_size', '64M' );
+@ini_set( 'max_execution_time', '300' );
+@ini_set( 'max_input_time', '300' );
+
+add_filter( 'upload_size_limit', function () {
+    return 64 * 1024 * 1024; // 64 MB
+} );
+
 // ─── Activation ──────────────────────────────────────────────────────────────
 
 register_activation_hook( __FILE__, 'plato_activate' );
