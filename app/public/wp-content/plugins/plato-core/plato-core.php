@@ -69,11 +69,16 @@ add_action( 'rest_api_init', function () {
             'http://localhost:3001',
             'http://localhost:3002',
             'http://plato.local',
+            'https://pwa-chi-six-32.vercel.app',
+            'https://plato.mojosamurai.com',
         );
 
         $origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '';
 
-        if ( in_array( $origin, $allowed_origins, true ) ) {
+        // Also allow any Vercel preview deployment for this project.
+        $is_vercel = preg_match( '/^https:\/\/pwa[-a-z0-9]*\.vercel\.app$/', $origin );
+
+        if ( in_array( $origin, $allowed_origins, true ) || $is_vercel ) {
             header( 'Access-Control-Allow-Origin: ' . $origin );
             header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
             header( 'Access-Control-Allow-Headers: Authorization, Content-Type' );
@@ -92,11 +97,16 @@ add_action( 'init', function () {
             'http://localhost:3001',
             'http://localhost:3002',
             'http://plato.local',
+            'https://pwa-chi-six-32.vercel.app',
+            'https://plato.mojosamurai.com',
         );
 
         $origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '';
 
-        if ( in_array( $origin, $allowed_origins, true ) ) {
+        // Also allow any Vercel preview deployment for this project.
+        $is_vercel = preg_match( '/^https:\/\/pwa[-a-z0-9]*\.vercel\.app$/', $origin );
+
+        if ( in_array( $origin, $allowed_origins, true ) || $is_vercel ) {
             header( 'Access-Control-Allow-Origin: ' . $origin );
             header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
             header( 'Access-Control-Allow-Headers: Authorization, Content-Type' );
