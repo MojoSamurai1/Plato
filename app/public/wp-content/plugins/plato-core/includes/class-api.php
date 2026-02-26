@@ -134,6 +134,37 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        // ─── Training Zone ──────────────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/training/modules', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_training_modules_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/training/generate/(?P<course_id>\d+)/(?P<module_name>[^/]+)', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'generate_training_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/training/scenarios/(?P<course_id>\d+)/(?P<module_name>[^/]+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_training_scenarios_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/training/submit', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'submit_training_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/training/progress/(?P<course_id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_training_progress_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Settings ──────────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/settings/llm', array(
             'methods'             => 'GET',
@@ -885,6 +916,495 @@ class Plato_API {
         Plato_Database::delete_study_note_file( $user_id, $file_name, $course_id );
 
         return new WP_REST_Response( array( 'deleted' => true ), 200 );
+    }
+
+    // ─── Training Zone Handlers ─────────────────────────────────────────────
+
+    public function get_training_modules_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'course_id' ) );
+        if ( ! $course_id ) {
+            // Return all courses with their modules.
+            $user_courses = Plato_Database::get_courses_for_user( $user_id );
+            $result = array();
+            foreach ( $user_courses as $c ) {
+                $modules = Plato_Database::get_training_modules_for_course( $user_id, (int) $c->id );
+                $total_modules  = count( $modules );
+                $mastered_count = 0;
+                foreach ( $modules as $m ) {
+                    if ( $m['mastered'] ) {
+                        $mastered_count++;
+                    }
+                }
+                $result[] = array(
+                    'course_id'       => (int) $c->id,
+                    'course_name'     => $c->name,
+                    'course_code'     => $c->course_code,
+                    'total_modules'   => $total_modules,
+                    'mastered_modules' => $mastered_count,
+                    'modules'         => $modules,
+                );
+            }
+            return new WP_REST_Response( array( 'courses' => $result ), 200 );
+        }
+
+        $modules = Plato_Database::get_training_modules_for_course( $user_id, $course_id );
+        return new WP_REST_Response( array( 'modules' => $modules ), 200 );
+    }
+
+    public function generate_training_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id   = absint( $request->get_param( 'course_id' ) );
+        $module_name = urldecode( $request->get_param( 'module_name' ) );
+
+        if ( ! $course_id || empty( $module_name ) ) {
+            return new WP_Error( 'plato_missing_params', 'course_id and module_name are required.', array( 'status' => 400 ) );
+        }
+
+        // Get module content.
+        $content = Plato_Database::get_module_content_for_training( $user_id, $course_id, $module_name );
+        if ( empty( $content ) ) {
+            return new WP_Error( 'plato_no_content', 'No synced content found for this module. Sync Canvas content first.', array( 'status' => 400 ) );
+        }
+
+        // Delete existing scenarios for this module (regenerate).
+        Plato_Database::delete_training_scenarios( $user_id, $course_id, $module_name );
+
+        // Increase time limit for LLM call.
+        set_time_limit( 120 );
+
+        // Call LLM to generate scenarios.
+        $system = "You are an expert educational assessment designer. Generate scenario-based exercises for university students.\n\n"
+                . "INSTRUCTIONS:\n"
+                . "- Create 3-5 realistic scenario-based exercises from the provided course content\n"
+                . "- Each scenario should have a title, a context paragraph (2-3 sentences setting up a realistic situation), and exactly 5 questions\n"
+                . "- Each scenario must have 4 MCQ questions (10 points each) and 1 short-answer question (10 points) = 50 points total per scenario\n"
+                . "- MCQ options should have exactly 4 choices (A, B, C, D)\n"
+                . "- Scenarios should be progressively more challenging\n"
+                . "- Short-answer questions should require applying knowledge, not just recalling facts\n"
+                . "- Include a rubric for each short-answer question to guide grading\n\n"
+                . "RESPOND WITH VALID JSON ONLY — no markdown, no explanation. Use this exact structure:\n"
+                . '{"scenarios":[{"title":"...","context":"...","questions":[{"type":"mcq","question":"...","options":["A","B","C","D"],"correct_option":0,"points":10},{"type":"short_answer","question":"...","rubric":"criteria for grading","points":10}]}]}';
+
+        $messages = array( array( 'role' => 'user', 'content' => "Generate training scenarios from this course module content:\n\n" . $content ) );
+
+        $api_key  = Plato_LLM::get_api_key();
+        if ( ! $api_key ) {
+            return new WP_Error( 'plato_llm_not_configured', 'LLM API key not configured.', array( 'status' => 400 ) );
+        }
+
+        $provider = Plato_LLM::get_provider();
+        $model    = Plato_LLM::get_model();
+
+        if ( $provider === Plato_LLM::PROVIDER_ANTHROPIC ) {
+            $result = self::call_llm_anthropic( $api_key, $model, $system, $messages );
+        } else {
+            $result = self::call_llm_openai( $api_key, $model, $system, $messages );
+        }
+
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        // Parse JSON response.
+        $response_text = $result['content'];
+
+        // Try to extract JSON from the response (handle markdown code blocks).
+        if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $response_text, $matches ) ) {
+            $response_text = trim( $matches[1] );
+        }
+
+        $parsed = json_decode( $response_text, true );
+        if ( ! $parsed || empty( $parsed['scenarios'] ) ) {
+            return new WP_Error( 'plato_parse_error', 'Failed to parse LLM response into scenarios.', array( 'status' => 500 ) );
+        }
+
+        // Insert scenarios into DB.
+        $inserted = array();
+        foreach ( $parsed['scenarios'] as $index => $scenario ) {
+            $total_points = 0;
+            foreach ( $scenario['questions'] ?? array() as $q ) {
+                $total_points += (int) ( $q['points'] ?? 10 );
+            }
+
+            $id = Plato_Database::insert_training_scenario( array(
+                'user_id'        => $user_id,
+                'course_id'      => $course_id,
+                'module_name'    => $module_name,
+                'scenario_index' => $index,
+                'title'          => sanitize_text_field( $scenario['title'] ?? "Scenario " . ( $index + 1 ) ),
+                'context'        => wp_kses_post( $scenario['context'] ?? '' ),
+                'questions'      => wp_json_encode( $scenario['questions'] ?? array() ),
+                'total_points'   => $total_points,
+            ) );
+
+            if ( $id ) {
+                $inserted[] = $id;
+            }
+        }
+
+        $scenarios = Plato_Database::get_training_scenarios( $user_id, $course_id, $module_name );
+
+        return new WP_REST_Response( array(
+            'success'    => true,
+            'generated'  => count( $inserted ),
+            'scenarios'  => $this->strip_scenario_answers( $scenarios ),
+        ), 201 );
+    }
+
+    public function get_training_scenarios_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id   = absint( $request->get_param( 'course_id' ) );
+        $module_name = urldecode( $request->get_param( 'module_name' ) );
+
+        $scenarios = Plato_Database::get_training_scenarios( $user_id, $course_id, $module_name );
+
+        // Enrich with best attempt info and strip answers.
+        $result = array();
+        foreach ( $scenarios as $s ) {
+            $best    = Plato_Database::get_best_attempt( $user_id, (int) $s->id );
+            $count   = Plato_Database::count_attempts( $user_id, (int) $s->id );
+            $questions = json_decode( $s->questions, true ) ?: array();
+
+            // Strip correct_option and rubric.
+            $safe_questions = array();
+            foreach ( $questions as $q ) {
+                $safe_q = array(
+                    'type'     => $q['type'],
+                    'question' => $q['question'],
+                    'points'   => $q['points'] ?? 10,
+                );
+                if ( $q['type'] === 'mcq' ) {
+                    $safe_q['options'] = $q['options'];
+                }
+                $safe_questions[] = $safe_q;
+            }
+
+            $result[] = array(
+                'id'             => (int) $s->id,
+                'scenario_index' => (int) $s->scenario_index,
+                'title'          => $s->title,
+                'context'        => $s->context,
+                'questions'      => $safe_questions,
+                'total_points'   => (int) $s->total_points,
+                'best_score'     => $best ? (float) $best->score_pct : null,
+                'passed'         => $best ? (bool) $best->passed : false,
+                'attempt_count'  => $count,
+                'created_at'     => $s->created_at,
+            );
+        }
+
+        return new WP_REST_Response( array( 'scenarios' => $result ), 200 );
+    }
+
+    public function submit_training_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $scenario_id = absint( $request->get_param( 'scenario_id' ) );
+        $answers     = $request->get_param( 'answers' );
+
+        if ( ! $scenario_id || ! is_array( $answers ) ) {
+            return new WP_Error( 'plato_missing_params', 'scenario_id and answers array are required.', array( 'status' => 400 ) );
+        }
+
+        $scenario = Plato_Database::get_training_scenario( $scenario_id, $user_id );
+        if ( ! $scenario ) {
+            return new WP_Error( 'plato_not_found', 'Scenario not found.', array( 'status' => 404 ) );
+        }
+
+        set_time_limit( 120 );
+
+        $questions = json_decode( $scenario->questions, true ) ?: array();
+        $mcq_points          = 0;
+        $short_answer_points = 0;
+        $max_points          = (int) $scenario->total_points;
+        $feedback            = array();
+
+        foreach ( $questions as $i => $q ) {
+            $student_answer = $answers[ $i ] ?? null;
+
+            if ( $q['type'] === 'mcq' ) {
+                $correct = (int) ( $q['correct_option'] ?? -1 );
+                $chosen  = is_numeric( $student_answer ) ? (int) $student_answer : -1;
+                $is_correct = $chosen === $correct;
+                $points = $is_correct ? (int) ( $q['points'] ?? 10 ) : 0;
+                $mcq_points += $points;
+
+                $feedback[] = array(
+                    'question_index' => $i,
+                    'type'           => 'mcq',
+                    'correct'        => $is_correct,
+                    'correct_option' => $correct,
+                    'chosen'         => $chosen,
+                    'points'         => $points,
+                    'max_points'     => (int) ( $q['points'] ?? 10 ),
+                );
+            } elseif ( $q['type'] === 'short_answer' ) {
+                $student_text = is_string( $student_answer ) ? trim( $student_answer ) : '';
+
+                if ( empty( $student_text ) ) {
+                    $feedback[] = array(
+                        'question_index' => $i,
+                        'type'           => 'short_answer',
+                        'score'          => 0,
+                        'max_points'     => (int) ( $q['points'] ?? 10 ),
+                        'feedback'       => 'No answer provided.',
+                    );
+                    continue;
+                }
+
+                // LLM grade the short answer.
+                $grading_result = $this->grade_short_answer(
+                    $q['question'],
+                    $q['rubric'] ?? '',
+                    $student_text,
+                    (int) ( $q['points'] ?? 10 )
+                );
+
+                $sa_score = 0;
+                $sa_feedback = 'Could not grade this answer.';
+
+                if ( ! is_wp_error( $grading_result ) ) {
+                    $sa_score    = (int) ( $grading_result['score'] ?? 0 );
+                    $sa_feedback = $grading_result['feedback'] ?? '';
+                }
+
+                $short_answer_points += $sa_score;
+
+                $feedback[] = array(
+                    'question_index' => $i,
+                    'type'           => 'short_answer',
+                    'score'          => $sa_score,
+                    'max_points'     => (int) ( $q['points'] ?? 10 ),
+                    'feedback'       => $sa_feedback,
+                );
+            }
+        }
+
+        $total_points = $mcq_points + $short_answer_points;
+        $score_pct    = $max_points > 0 ? round( ( $total_points / $max_points ) * 100, 2 ) : 0;
+        $passed       = $score_pct >= 90;
+
+        $attempt_id = Plato_Database::insert_training_attempt( array(
+            'user_id'             => $user_id,
+            'scenario_id'        => $scenario_id,
+            'answers'            => wp_json_encode( $answers ),
+            'mcq_points'         => $mcq_points,
+            'short_answer_points' => $short_answer_points,
+            'total_points'       => $total_points,
+            'max_points'         => $max_points,
+            'score_pct'          => $score_pct,
+            'passed'             => $passed ? 1 : 0,
+            'feedback'           => wp_json_encode( $feedback ),
+        ) );
+
+        return new WP_REST_Response( array(
+            'attempt_id'          => $attempt_id,
+            'mcq_points'          => $mcq_points,
+            'short_answer_points' => $short_answer_points,
+            'total_points'        => $total_points,
+            'max_points'          => $max_points,
+            'score_pct'           => $score_pct,
+            'passed'              => $passed,
+            'feedback'            => $feedback,
+        ), 200 );
+    }
+
+    public function get_training_progress_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'course_id' ) );
+        if ( ! $course_id ) {
+            return new WP_Error( 'plato_missing_params', 'course_id is required.', array( 'status' => 400 ) );
+        }
+
+        $modules = Plato_Database::get_training_modules_for_course( $user_id, $course_id );
+
+        $total_modules  = count( $modules );
+        $mastered_count = 0;
+        foreach ( $modules as $m ) {
+            if ( $m['mastered'] ) {
+                $mastered_count++;
+            }
+        }
+
+        return new WP_REST_Response( array(
+            'course_id'        => $course_id,
+            'total_modules'    => $total_modules,
+            'mastered_modules' => $mastered_count,
+            'modules'          => $modules,
+        ), 200 );
+    }
+
+    // ─── Training Zone Helpers ───────────────────────────────────────────────
+
+    private function strip_scenario_answers( array $scenarios ): array {
+        $result = array();
+        foreach ( $scenarios as $s ) {
+            $questions = json_decode( $s->questions, true ) ?: array();
+            $safe_questions = array();
+            foreach ( $questions as $q ) {
+                $safe_q = array(
+                    'type'     => $q['type'],
+                    'question' => $q['question'],
+                    'points'   => $q['points'] ?? 10,
+                );
+                if ( $q['type'] === 'mcq' ) {
+                    $safe_q['options'] = $q['options'];
+                }
+                $safe_questions[] = $safe_q;
+            }
+            $result[] = array(
+                'id'             => (int) $s->id,
+                'scenario_index' => (int) $s->scenario_index,
+                'title'          => $s->title,
+                'context'        => $s->context,
+                'questions'      => $safe_questions,
+                'total_points'   => (int) $s->total_points,
+                'created_at'     => $s->created_at,
+            );
+        }
+        return $result;
+    }
+
+    private function grade_short_answer( string $question, string $rubric, string $student_answer, int $max_points ): array|WP_Error {
+        $api_key = Plato_LLM::get_api_key();
+        if ( ! $api_key ) {
+            return new WP_Error( 'plato_llm_not_configured', 'LLM not configured.' );
+        }
+
+        $system = "You are an encouraging educational grader. Grade the student's short answer.\n\n"
+                . "RESPOND WITH VALID JSON ONLY:\n"
+                . '{"score": 0, "feedback": "encouraging feedback"}' . "\n\n"
+                . "Score range: 0 to {$max_points}. Be fair but encouraging. "
+                . "Give partial credit for partially correct answers.";
+
+        $user_msg = "QUESTION: {$question}\n\nRUBRIC: {$rubric}\n\nSTUDENT ANSWER: {$student_answer}\n\nGrade this answer (0-{$max_points} points):";
+
+        $messages = array( array( 'role' => 'user', 'content' => $user_msg ) );
+
+        $provider = Plato_LLM::get_provider();
+        $model    = Plato_LLM::get_model();
+
+        if ( $provider === Plato_LLM::PROVIDER_ANTHROPIC ) {
+            $result = self::call_llm_anthropic( $api_key, $model, $system, $messages );
+        } else {
+            $result = self::call_llm_openai( $api_key, $model, $system, $messages );
+        }
+
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        $response_text = $result['content'];
+        if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $response_text, $matches ) ) {
+            $response_text = trim( $matches[1] );
+        }
+
+        $parsed = json_decode( $response_text, true );
+        if ( ! $parsed || ! isset( $parsed['score'] ) ) {
+            return array( 'score' => 0, 'feedback' => 'Unable to grade automatically.' );
+        }
+
+        // Clamp score.
+        $parsed['score'] = max( 0, min( $max_points, (int) $parsed['score'] ) );
+
+        return $parsed;
+    }
+
+    private static function call_llm_openai( string $api_key, string $model, string $system, array $messages ): array|WP_Error {
+        $api_messages = array_merge(
+            array( array( 'role' => 'system', 'content' => $system ) ),
+            $messages
+        );
+
+        $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type'  => 'application/json',
+            ),
+            'body'    => wp_json_encode( array(
+                'model'       => $model,
+                'messages'    => $api_messages,
+                'max_tokens'  => 2048,
+                'temperature' => 0.7,
+            ) ),
+            'timeout' => 90,
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return new WP_Error( 'plato_llm_request_failed', $response->get_error_message() );
+        }
+
+        $status = wp_remote_retrieve_response_code( $response );
+        $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( $status >= 400 ) {
+            return new WP_Error( 'plato_llm_api_error', $body['error']['message'] ?? "API returned $status", array( 'status' => $status ) );
+        }
+
+        return array(
+            'content'     => $body['choices'][0]['message']['content'] ?? '',
+            'tokens_used' => $body['usage']['total_tokens'] ?? 0,
+        );
+    }
+
+    private static function call_llm_anthropic( string $api_key, string $model, string $system, array $messages ): array|WP_Error {
+        $response = wp_remote_post( 'https://api.anthropic.com/v1/messages', array(
+            'headers' => array(
+                'x-api-key'         => $api_key,
+                'anthropic-version' => '2023-06-01',
+                'Content-Type'      => 'application/json',
+            ),
+            'body'    => wp_json_encode( array(
+                'model'      => $model,
+                'system'     => $system,
+                'messages'   => $messages,
+                'max_tokens' => 2048,
+            ) ),
+            'timeout' => 90,
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return new WP_Error( 'plato_llm_request_failed', $response->get_error_message() );
+        }
+
+        $status = wp_remote_retrieve_response_code( $response );
+        $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( $status >= 400 ) {
+            return new WP_Error( 'plato_llm_api_error', $body['error']['message'] ?? "API returned $status", array( 'status' => $status ) );
+        }
+
+        $content = '';
+        foreach ( $body['content'] ?? array() as $block ) {
+            if ( $block['type'] === 'text' ) {
+                $content .= $block['text'];
+            }
+        }
+
+        return array(
+            'content'     => $content,
+            'tokens_used' => ( $body['usage']['input_tokens'] ?? 0 ) + ( $body['usage']['output_tokens'] ?? 0 ),
+        );
     }
 
     // ─── Dashboard Handlers ─────────────────────────────────────────────────

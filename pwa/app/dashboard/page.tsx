@@ -128,6 +128,12 @@ function DashboardContent() {
               Learning
             </Link>
             <Link
+              href="/training"
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+            >
+              Training
+            </Link>
+            <Link
               href="/notes"
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
             >

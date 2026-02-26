@@ -275,6 +275,12 @@ function ChatContent() {
             &larr; Dashboard
           </Link>
           <Link
+            href="/training"
+            className="block text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition px-2"
+          >
+            Training Zone
+          </Link>
+          <Link
             href="/notes"
             className="block text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition px-2"
           >

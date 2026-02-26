@@ -417,6 +417,97 @@ export const notes = {
   },
 };
 
+// ─── Training Zone ────────────────────────────────────────────────────────
+
+export interface TrainingQuestion {
+  type: 'mcq' | 'short_answer';
+  question: string;
+  options?: string[];
+  points: number;
+}
+
+export interface TrainingScenario {
+  id: number;
+  scenario_index: number;
+  title: string;
+  context: string;
+  questions: TrainingQuestion[];
+  total_points: number;
+  best_score: number | null;
+  passed: boolean;
+  attempt_count: number;
+  created_at: string;
+}
+
+export interface TrainingModuleInfo {
+  module_name: string;
+  page_count: number;
+  total_scenarios: number;
+  passed_scenarios: number;
+  mastered: boolean;
+}
+
+export interface TrainingCourseInfo {
+  course_id: number;
+  course_name: string;
+  course_code: string;
+  total_modules: number;
+  mastered_modules: number;
+  modules: TrainingModuleInfo[];
+}
+
+export interface TrainingFeedbackItem {
+  question_index: number;
+  type: 'mcq' | 'short_answer';
+  correct?: boolean;
+  correct_option?: number;
+  chosen?: number;
+  score?: number;
+  points?: number;
+  max_points: number;
+  feedback?: string;
+}
+
+export interface TrainingSubmitResponse {
+  attempt_id: number;
+  mcq_points: number;
+  short_answer_points: number;
+  total_points: number;
+  max_points: number;
+  score_pct: number;
+  passed: boolean;
+  feedback: TrainingFeedbackItem[];
+}
+
+export interface TrainingProgressResponse {
+  course_id: number;
+  total_modules: number;
+  mastered_modules: number;
+  modules: TrainingModuleInfo[];
+}
+
+export const training = {
+  modules(courseId?: number): Promise<{ courses?: TrainingCourseInfo[]; modules?: TrainingModuleInfo[] }> {
+    const qs = courseId ? `?course_id=${courseId}` : '';
+    return apiFetch(`/training/modules${qs}`);
+  },
+  generate(courseId: number, moduleName: string): Promise<{ success: boolean; generated: number; scenarios: TrainingScenario[] }> {
+    return apiFetch(`/training/generate/${courseId}/${encodeURIComponent(moduleName)}`, { method: 'POST' });
+  },
+  scenarios(courseId: number, moduleName: string): Promise<{ scenarios: TrainingScenario[] }> {
+    return apiFetch(`/training/scenarios/${courseId}/${encodeURIComponent(moduleName)}`);
+  },
+  submit(scenarioId: number, answers: (number | string | null)[]): Promise<TrainingSubmitResponse> {
+    return apiFetch('/training/submit', {
+      method: 'POST',
+      body: JSON.stringify({ scenario_id: scenarioId, answers }),
+    });
+  },
+  progress(courseId: number): Promise<TrainingProgressResponse> {
+    return apiFetch(`/training/progress/${courseId}`);
+  },
+};
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export interface DashboardOverview {

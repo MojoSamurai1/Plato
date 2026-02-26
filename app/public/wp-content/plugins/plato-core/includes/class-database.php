@@ -120,6 +120,38 @@ class Plato_Database {
             UNIQUE KEY           canvas_user (canvas_assignment_id, user_id),
             KEY                  plato_course_id (plato_course_id),
             KEY                  user_due (user_id, due_at)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_training_scenarios (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            course_id       BIGINT UNSIGNED NOT NULL,
+            module_name     VARCHAR(255)    NOT NULL DEFAULT '',
+            scenario_index  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            title           VARCHAR(255)    NOT NULL DEFAULT '',
+            context         TEXT            NOT NULL,
+            questions       LONGTEXT        NOT NULL,
+            total_points    INT UNSIGNED    NOT NULL DEFAULT 0,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            KEY             user_module (user_id, course_id, module_name(191))
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_training_attempts (
+            id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id             BIGINT UNSIGNED NOT NULL,
+            scenario_id         BIGINT UNSIGNED NOT NULL,
+            answers             LONGTEXT        NOT NULL,
+            mcq_points          INT UNSIGNED    NOT NULL DEFAULT 0,
+            short_answer_points INT UNSIGNED    NOT NULL DEFAULT 0,
+            total_points        INT UNSIGNED    NOT NULL DEFAULT 0,
+            max_points          INT UNSIGNED    NOT NULL DEFAULT 0,
+            score_pct           DECIMAL(5,2)    NOT NULL DEFAULT 0.00,
+            passed              TINYINT(1)      NOT NULL DEFAULT 0,
+            feedback            LONGTEXT                 DEFAULT NULL,
+            created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY         (id),
+            KEY                 user_scenario (user_id, scenario_id)
         ) $charset_collate;";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -605,6 +637,207 @@ class Plato_Database {
             $course_id,
             $file_name
         ) );
+    }
+
+    // ─── Training Scenarios CRUD ────────────────────────────────────────────
+
+    public static function insert_training_scenario( array $data ): int|false {
+        global $wpdb;
+        $result = $wpdb->insert( $wpdb->prefix . 'plato_training_scenarios', $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    public static function get_training_scenarios( int $user_id, int $course_id, string $module_name ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_training_scenarios';
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND course_id = %d AND module_name = %s ORDER BY scenario_index ASC",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+    }
+
+    public static function get_training_scenario( int $id, int $user_id ): object|null {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_training_scenarios';
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE id = %d AND user_id = %d",
+            $id,
+            $user_id
+        ) );
+    }
+
+    public static function delete_training_scenarios( int $user_id, int $course_id, string $module_name ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_training_scenarios';
+
+        // Also delete related attempts.
+        $scenario_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT id FROM $table WHERE user_id = %d AND course_id = %d AND module_name = %s",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+
+        if ( ! empty( $scenario_ids ) ) {
+            $ids_placeholder = implode( ',', array_map( 'intval', $scenario_ids ) );
+            $wpdb->query( "DELETE FROM {$wpdb->prefix}plato_training_attempts WHERE scenario_id IN ($ids_placeholder)" );
+        }
+
+        $wpdb->delete( $table, array(
+            'user_id'     => $user_id,
+            'course_id'   => $course_id,
+            'module_name' => $module_name,
+        ) );
+
+        return true;
+    }
+
+    // ─── Training Attempts CRUD ─────────────────────────────────────────────
+
+    public static function insert_training_attempt( array $data ): int|false {
+        global $wpdb;
+        $result = $wpdb->insert( $wpdb->prefix . 'plato_training_attempts', $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    public static function get_best_attempt( int $user_id, int $scenario_id ): object|null {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_training_attempts';
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND scenario_id = %d ORDER BY score_pct DESC, created_at DESC LIMIT 1",
+            $user_id,
+            $scenario_id
+        ) );
+    }
+
+    public static function count_attempts( int $user_id, int $scenario_id ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_training_attempts';
+
+        return (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE user_id = %d AND scenario_id = %d",
+            $user_id,
+            $scenario_id
+        ) );
+    }
+
+    public static function get_module_mastery( int $user_id, int $course_id, string $module_name ): array {
+        global $wpdb;
+        $scenarios_table = $wpdb->prefix . 'plato_training_scenarios';
+        $attempts_table  = $wpdb->prefix . 'plato_training_attempts';
+
+        $scenarios = $wpdb->get_results( $wpdb->prepare(
+            "SELECT s.id,
+                    MAX(a.score_pct) AS best_score,
+                    MAX(a.passed) AS ever_passed,
+                    COUNT(a.id) AS attempt_count
+             FROM $scenarios_table s
+             LEFT JOIN $attempts_table a ON a.scenario_id = s.id AND a.user_id = s.user_id
+             WHERE s.user_id = %d AND s.course_id = %d AND s.module_name = %s
+             GROUP BY s.id
+             ORDER BY s.scenario_index ASC",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+
+        $total     = count( $scenarios );
+        $passed    = 0;
+        foreach ( $scenarios as $s ) {
+            if ( (int) $s->ever_passed === 1 ) {
+                $passed++;
+            }
+        }
+
+        return array(
+            'total_scenarios'  => $total,
+            'passed_scenarios' => $passed,
+            'mastered'         => $total > 0 && $passed === $total,
+            'scenarios'        => $scenarios,
+        );
+    }
+
+    public static function get_training_modules_for_course( int $user_id, int $course_id ): array {
+        global $wpdb;
+        $canvas_table    = $wpdb->prefix . 'plato_canvas_content';
+        $scenarios_table = $wpdb->prefix . 'plato_training_scenarios';
+        $attempts_table  = $wpdb->prefix . 'plato_training_attempts';
+
+        // Get modules with page counts from canvas content.
+        $modules = $wpdb->get_results( $wpdb->prepare(
+            "SELECT module_name, COUNT(*) AS page_count
+             FROM $canvas_table
+             WHERE user_id = %d AND plato_course_id = %d AND module_name != ''
+             GROUP BY module_name
+             ORDER BY module_name ASC",
+            $user_id,
+            $course_id
+        ) );
+
+        $result = array();
+        foreach ( $modules as $mod ) {
+            $mastery = self::get_module_mastery( $user_id, $course_id, $mod->module_name );
+            $result[] = array(
+                'module_name'       => $mod->module_name,
+                'page_count'        => (int) $mod->page_count,
+                'total_scenarios'   => $mastery['total_scenarios'],
+                'passed_scenarios'  => $mastery['passed_scenarios'],
+                'mastered'          => $mastery['mastered'],
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get module content chunks for scenario generation.
+     */
+    public static function get_module_content_for_training( int $user_id, int $course_id, string $module_name ): string {
+        global $wpdb;
+        $canvas_table = $wpdb->prefix . 'plato_canvas_content';
+        $notes_table  = $wpdb->prefix . 'plato_study_notes';
+
+        // Get file_names for this module's content.
+        $content_items = $wpdb->get_results( $wpdb->prepare(
+            "SELECT title, content_key
+             FROM $canvas_table
+             WHERE user_id = %d AND plato_course_id = %d AND module_name = %s
+             ORDER BY title ASC",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+
+        $all_content = '';
+        foreach ( $content_items as $item ) {
+            // Study notes are stored with file_name matching the content_key pattern.
+            $chunks = $wpdb->get_results( $wpdb->prepare(
+                "SELECT content FROM $notes_table
+                 WHERE user_id = %d AND course_id = %d AND file_name LIKE %s AND status = 'completed'
+                 ORDER BY chunk_index ASC",
+                $user_id,
+                $course_id,
+                '%' . $wpdb->esc_like( $item->title ) . '%'
+            ) );
+
+            foreach ( $chunks as $chunk ) {
+                if ( $chunk->content ) {
+                    $all_content .= $chunk->content . "\n\n";
+                }
+            }
+        }
+
+        // Cap at ~12000 chars.
+        if ( mb_strlen( $all_content ) > 12000 ) {
+            $all_content = mb_substr( $all_content, 0, 12000 ) . "\n\n... (content truncated)";
+        }
+
+        return trim( $all_content );
     }
 
     // ─── Dashboard Stats ────────────────────────────────────────────────────
