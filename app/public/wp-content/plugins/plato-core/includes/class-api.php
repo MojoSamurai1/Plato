@@ -65,6 +65,12 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        register_rest_route( self::NAMESPACE, '/courses/(?P<id>\d+)/content', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_course_content_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Chat (P2: Socratic Tutor) ─────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/chat/conversations', array(
             'methods'             => 'GET',
@@ -118,6 +124,13 @@ class Plato_API {
         register_rest_route( self::NAMESPACE, '/notes/delete', array(
             'methods'             => 'POST',
             'callback'            => array( $this, 'delete_note_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        // ─── Dashboard ──────────────────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/dashboard/stats', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_dashboard_stats_handler' ),
             'permission_callback' => '__return_true',
         ) );
 
@@ -354,6 +367,59 @@ class Plato_API {
         return new WP_REST_Response( array(
             'assignments' => $assignments,
             'total'       => count( $assignments ),
+        ), 200 );
+    }
+
+    public function get_course_content_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'id' ) );
+        if ( ! $course_id ) {
+            return new WP_Error( 'plato_missing_course', 'Course ID is required.', array( 'status' => 400 ) );
+        }
+
+        // Get canvas content items grouped by module.
+        $items = Plato_Database::get_canvas_content_for_course( $user_id, $course_id );
+
+        // Group by module.
+        $modules = array();
+        foreach ( $items as $item ) {
+            $mod = $item->module_name ?: 'Ungrouped';
+            if ( ! isset( $modules[ $mod ] ) ) {
+                $modules[ $mod ] = array();
+            }
+            $modules[ $mod ][] = array(
+                'id'             => (int) $item->id,
+                'title'          => $item->title,
+                'content_type'   => $item->content_type,
+                'chunks_created' => (int) $item->chunks_created,
+                'synced_at'      => $item->synced_at,
+            );
+        }
+
+        // Convert to ordered array format.
+        $module_list = array();
+        foreach ( $modules as $name => $pages ) {
+            $module_list[] = array(
+                'module_name' => $name,
+                'pages'       => $pages,
+            );
+        }
+
+        // Also get assignments for this course.
+        $assignments = Plato_Database::get_assignments_for_user( $user_id, array( 'course_id' => $course_id ) );
+
+        // Get study notes for this course.
+        $study_notes = Plato_Database::get_study_note_files( $user_id, $course_id );
+
+        return new WP_REST_Response( array(
+            'modules'      => $module_list,
+            'assignments'  => $assignments,
+            'study_notes'  => $study_notes,
+            'total_pages'  => count( $items ),
         ), 200 );
     }
 
@@ -819,6 +885,19 @@ class Plato_API {
         Plato_Database::delete_study_note_file( $user_id, $file_name, $course_id );
 
         return new WP_REST_Response( array( 'deleted' => true ), 200 );
+    }
+
+    // ─── Dashboard Handlers ─────────────────────────────────────────────────
+
+    public function get_dashboard_stats_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $stats = Plato_Database::get_dashboard_stats( $user_id );
+
+        return new WP_REST_Response( $stats, 200 );
     }
 
     // ─── Settings Handlers ───────────────────────────────────────────────────

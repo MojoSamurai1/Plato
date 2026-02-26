@@ -153,9 +153,32 @@ interface CoursesResponse {
   last_sync: string | null;
 }
 
+export interface CourseContentPage {
+  id: number;
+  title: string;
+  content_type: string;
+  chunks_created: number;
+  synced_at: string;
+}
+
+export interface CourseModule {
+  module_name: string;
+  pages: CourseContentPage[];
+}
+
+export interface CourseContentResponse {
+  modules: CourseModule[];
+  assignments: Assignment[];
+  study_notes: StudyNote[];
+  total_pages: number;
+}
+
 export const courses = {
   list(): Promise<CoursesResponse> {
     return apiFetch('/courses');
+  },
+  content(courseId: number): Promise<CourseContentResponse> {
+    return apiFetch(`/courses/${courseId}/content`);
   },
 };
 
@@ -391,6 +414,72 @@ export const notes = {
       method: 'POST',
       body: JSON.stringify({ file_name: fileName, course_id: courseId }),
     });
+  },
+};
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+export interface DashboardOverview {
+  total_courses: number;
+  active_courses: number;
+  concluded_courses: number;
+  total_assignments: number;
+  upcoming_assignments: number;
+  overdue_assignments: number;
+}
+
+export interface DashboardEngagement {
+  total_conversations: number;
+  total_messages: number;
+  socratic_conversations: number;
+  eli5_conversations: number;
+  conversations_this_week: number;
+  messages_this_week: number;
+  avg_messages_per_conversation: number;
+  streak_days: number;
+}
+
+export interface DashboardKnowledgeBase {
+  canvas_pages_synced: number;
+  canvas_total_chunks: number;
+  study_notes_uploaded: number;
+  study_notes_processed: number;
+  study_notes_pending: number;
+}
+
+export interface DashboardCourseStat {
+  course_id: number;
+  course_name: string;
+  course_code: string;
+  workflow_state: string;
+  assignment_count: number;
+  upcoming_count: number;
+  overdue_count: number;
+  conversation_count: number;
+  message_count: number;
+  notes_count: number;
+  canvas_pages: number;
+  last_activity: string | null;
+}
+
+export interface DashboardTimelineEntry {
+  date: string;
+  messages: number;
+  conversations: number;
+}
+
+export interface DashboardStats {
+  overview: DashboardOverview;
+  engagement: DashboardEngagement;
+  knowledge_base: DashboardKnowledgeBase;
+  course_stats: DashboardCourseStat[];
+  activity_timeline: DashboardTimelineEntry[];
+  generated_at: string;
+}
+
+export const dashboard = {
+  stats(): Promise<DashboardStats> {
+    return apiFetch('/dashboard/stats');
   },
 };
 
