@@ -867,7 +867,7 @@ class Plato_Database {
 
     /**
      * Get aggregated dashboard stats for a user.
-     * Runs separate queries to avoid JOIN multiplication.
+     * Optimised: 6 queries total (was 16+).
      */
     public static function get_dashboard_stats( int $user_id ): array {
         global $wpdb;
@@ -880,69 +880,60 @@ class Plato_Database {
         $canvas_t        = $wpdb->prefix . 'plato_canvas_content';
         $now             = current_time( 'mysql', true );
         $week_ago        = gmdate( 'Y-m-d H:i:s', time() - 7 * 86400 );
+        $week_ahead      = gmdate( 'Y-m-d H:i:s', time() + 7 * 86400 );
+        $fourteen_days_ago = gmdate( 'Y-m-d', time() - 14 * 86400 );
 
-        // 1. Course overview
-        $course_row = $wpdb->get_row( $wpdb->prepare(
+        // ── Query 1: Courses + assignments + knowledge base in one shot ──
+        $overview = $wpdb->get_row( $wpdb->prepare(
             "SELECT
-                COUNT(*) AS total_courses,
-                SUM(CASE WHEN workflow_state = 'available' THEN 1 ELSE 0 END) AS active_courses,
-                SUM(CASE WHEN workflow_state = 'completed' THEN 1 ELSE 0 END) AS concluded_courses
-             FROM $courses_t WHERE user_id = %d",
-            $user_id
+                (SELECT COUNT(*) FROM $courses_t WHERE user_id = %d) AS total_courses,
+                (SELECT SUM(CASE WHEN workflow_state = 'available' THEN 1 ELSE 0 END) FROM $courses_t WHERE user_id = %d) AS active_courses,
+                (SELECT SUM(CASE WHEN workflow_state = 'completed' THEN 1 ELSE 0 END) FROM $courses_t WHERE user_id = %d) AS concluded_courses,
+                (SELECT COUNT(*) FROM $assignments_t WHERE user_id = %d) AS total_assignments,
+                (SELECT SUM(CASE WHEN due_at >= %s AND due_at <= %s THEN 1 ELSE 0 END) FROM $assignments_t WHERE user_id = %d) AS upcoming_assignments,
+                (SELECT SUM(CASE WHEN due_at < %s THEN 1 ELSE 0 END) FROM $assignments_t WHERE user_id = %d) AS overdue_assignments,
+                (SELECT COUNT(*) FROM $canvas_t WHERE user_id = %d) AS canvas_pages_synced,
+                (SELECT COALESCE(SUM(chunks_created), 0) FROM $canvas_t WHERE user_id = %d) AS canvas_total_chunks,
+                (SELECT COUNT(DISTINCT file_name) FROM $notes_t WHERE user_id = %d) AS study_notes_uploaded,
+                (SELECT SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) FROM $notes_t WHERE user_id = %d) AS study_notes_processed,
+                (SELECT SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) FROM $notes_t WHERE user_id = %d) AS study_notes_pending",
+            $user_id, $user_id, $user_id,
+            $user_id,
+            $now, $week_ahead, $user_id,
+            $now, $user_id,
+            $user_id, $user_id,
+            $user_id, $user_id, $user_id
         ) );
 
-        // 2. Assignment overview
-        $assign_row = $wpdb->get_row( $wpdb->prepare(
+        // ── Query 2: Conversation + message aggregates ──
+        $engage = $wpdb->get_row( $wpdb->prepare(
             "SELECT
-                COUNT(*) AS total_assignments,
-                SUM(CASE WHEN due_at >= %s AND due_at <= %s THEN 1 ELSE 0 END) AS upcoming_assignments,
-                SUM(CASE WHEN due_at < %s THEN 1 ELSE 0 END) AS overdue_assignments
-             FROM $assignments_t WHERE user_id = %d",
-            $now,
-            gmdate( 'Y-m-d H:i:s', time() + 7 * 86400 ),
-            $now,
-            $user_id
+                (SELECT COUNT(*) FROM $conversations_t WHERE user_id = %d) AS total_conversations,
+                (SELECT SUM(CASE WHEN mode = 'socratic' THEN 1 ELSE 0 END) FROM $conversations_t WHERE user_id = %d) AS socratic_conversations,
+                (SELECT SUM(CASE WHEN mode = 'eli5' THEN 1 ELSE 0 END) FROM $conversations_t WHERE user_id = %d) AS eli5_conversations,
+                (SELECT SUM(CASE WHEN created_at >= %s THEN 1 ELSE 0 END) FROM $conversations_t WHERE user_id = %d) AS conversations_this_week,
+                (SELECT COUNT(*) FROM $messages_t m INNER JOIN $conversations_t cv ON cv.id = m.conversation_id WHERE cv.user_id = %d AND m.role = 'user') AS total_messages,
+                (SELECT COUNT(*) FROM $messages_t m INNER JOIN $conversations_t cv ON cv.id = m.conversation_id WHERE cv.user_id = %d AND m.role = 'user' AND m.created_at >= %s) AS messages_this_week",
+            $user_id, $user_id, $user_id,
+            $week_ago, $user_id,
+            $user_id,
+            $user_id, $week_ago
         ) );
 
-        // 3. Conversation aggregate
-        $convo_row = $wpdb->get_row( $wpdb->prepare(
-            "SELECT
-                COUNT(*) AS total_conversations,
-                SUM(CASE WHEN mode = 'socratic' THEN 1 ELSE 0 END) AS socratic_conversations,
-                SUM(CASE WHEN mode = 'eli5' THEN 1 ELSE 0 END) AS eli5_conversations,
-                SUM(CASE WHEN created_at >= %s THEN 1 ELSE 0 END) AS conversations_this_week
-             FROM $conversations_t WHERE user_id = %d",
-            $week_ago,
-            $user_id
-        ) );
+        $total_convos = (int) ( $engage->total_conversations ?? 0 );
+        $total_msgs   = (int) ( $engage->total_messages ?? 0 );
+        $avg_msgs     = $total_convos > 0 ? round( $total_msgs / $total_convos, 1 ) : 0;
 
-        // 4. Message aggregate (user messages only)
-        $msg_row = $wpdb->get_row( $wpdb->prepare(
-            "SELECT
-                COUNT(*) AS total_messages,
-                SUM(CASE WHEN m.created_at >= %s THEN 1 ELSE 0 END) AS messages_this_week
-             FROM $messages_t m
-             INNER JOIN $conversations_t cv ON cv.id = m.conversation_id
-             WHERE cv.user_id = %d AND m.role = 'user'",
-            $week_ago,
-            $user_id
-        ) );
-
-        $avg_msgs = 0;
-        $total_convos = (int) $convo_row->total_conversations;
-        $total_msgs   = (int) $msg_row->total_messages;
-        if ( $total_convos > 0 ) {
-            $avg_msgs = round( $total_msgs / $total_convos, 1 );
-        }
-
-        // 5. Streak — consecutive days with at least one message
+        // ── Query 3: Streak — only recent dates (cap at 60 days back) ──
+        $streak_cutoff = gmdate( 'Y-m-d', time() - 60 * 86400 );
         $active_dates = $wpdb->get_col( $wpdb->prepare(
             "SELECT DISTINCT DATE(m.created_at) AS d
              FROM $messages_t m
              INNER JOIN $conversations_t cv ON cv.id = m.conversation_id
-             WHERE cv.user_id = %d AND m.role = 'user'
+             WHERE cv.user_id = %d AND m.role = 'user' AND DATE(m.created_at) >= %s
              ORDER BY d DESC",
-            $user_id
+            $user_id,
+            $streak_cutoff
         ) );
 
         $streak = 0;
@@ -951,30 +942,15 @@ class Plato_Database {
             if ( $d === $check_date ) {
                 $streak++;
                 $check_date = gmdate( 'Y-m-d', strtotime( $check_date . ' -1 day' ) );
+            } elseif ( $streak === 0 && $d === gmdate( 'Y-m-d', strtotime( $check_date . ' -1 day' ) ) ) {
+                $streak++;
+                $check_date = gmdate( 'Y-m-d', strtotime( $d . ' -1 day' ) );
             } else {
-                // Allow yesterday to start the streak if today has no messages yet
-                if ( $streak === 0 && $d === gmdate( 'Y-m-d', strtotime( $check_date . ' -1 day' ) ) ) {
-                    $streak++;
-                    $check_date = gmdate( 'Y-m-d', strtotime( $d . ' -1 day' ) );
-                } else {
-                    break;
-                }
+                break;
             }
         }
 
-        // 6. Knowledge base
-        $canvas_stats = self::get_canvas_content_stats( $user_id );
-
-        $notes_row = $wpdb->get_row( $wpdb->prepare(
-            "SELECT
-                COUNT(DISTINCT file_name) AS study_notes_uploaded,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS study_notes_processed,
-                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS study_notes_pending
-             FROM $notes_t WHERE user_id = %d",
-            $user_id
-        ) );
-
-        // 7. Per-course stats — separate subqueries merged by course_id
+        // ── Query 4: Per-course stats (all in one query per table) ──
         $all_courses = $wpdb->get_results( $wpdb->prepare(
             "SELECT id, name, course_code, workflow_state FROM $courses_t WHERE user_id = %d ORDER BY name ASC",
             $user_id
@@ -984,93 +960,48 @@ class Plato_Database {
         $course_stats = array();
 
         if ( ! empty( $course_ids ) ) {
-            $ids_placeholder = implode( ',', array_map( 'intval', $course_ids ) );
+            $ids_in = implode( ',', array_map( 'intval', $course_ids ) );
 
-            // Assignments per course
-            $assign_counts = $wpdb->get_results(
-                "SELECT plato_course_id AS course_id,
-                    COUNT(*) AS assignment_count,
-                    SUM(CASE WHEN due_at >= '{$now}' AND due_at <= '" . gmdate( 'Y-m-d H:i:s', time() + 7 * 86400 ) . "' THEN 1 ELSE 0 END) AS upcoming_count,
-                    SUM(CASE WHEN due_at < '{$now}' THEN 1 ELSE 0 END) AS overdue_count
-                 FROM $assignments_t
-                 WHERE plato_course_id IN ($ids_placeholder)
-                 GROUP BY plato_course_id",
-                OBJECT_K
-            );
-
-            // Conversations per course
-            $convo_counts = $wpdb->get_results(
-                "SELECT course_id,
-                    COUNT(*) AS conversation_count
-                 FROM $conversations_t
-                 WHERE course_id IN ($ids_placeholder)
-                 GROUP BY course_id",
-                OBJECT_K
-            );
-
-            // Messages per course
-            $msg_counts = $wpdb->get_results(
-                "SELECT cv.course_id,
-                    COUNT(m.id) AS message_count
-                 FROM $messages_t m
-                 INNER JOIN $conversations_t cv ON cv.id = m.conversation_id
-                 WHERE cv.course_id IN ($ids_placeholder) AND m.role = 'user'
-                 GROUP BY cv.course_id",
-                OBJECT_K
-            );
-
-            // Notes per course
-            $note_counts = $wpdb->get_results(
-                "SELECT course_id,
-                    COUNT(DISTINCT file_name) AS notes_count
-                 FROM $notes_t
-                 WHERE course_id IN ($ids_placeholder)
-                 GROUP BY course_id",
-                OBJECT_K
-            );
-
-            // Canvas pages per course
-            $canvas_counts = $wpdb->get_results(
-                "SELECT plato_course_id AS course_id,
-                    COUNT(*) AS canvas_pages
-                 FROM $canvas_t
-                 WHERE plato_course_id IN ($ids_placeholder)
-                 GROUP BY plato_course_id",
-                OBJECT_K
-            );
-
-            // Last activity per course (most recent message)
-            $last_activity = $wpdb->get_results(
-                "SELECT cv.course_id,
-                    MAX(m.created_at) AS last_activity
-                 FROM $messages_t m
-                 INNER JOIN $conversations_t cv ON cv.id = m.conversation_id
-                 WHERE cv.course_id IN ($ids_placeholder)
-                 GROUP BY cv.course_id",
+            // Single query with all per-course stats via subqueries
+            $esc_now   = esc_sql( $now );
+            $esc_ahead = esc_sql( $week_ahead );
+            $per_course_rows = $wpdb->get_results(
+                "SELECT c.id AS course_id,
+                    (SELECT COUNT(*) FROM $assignments_t WHERE plato_course_id = c.id) AS assignment_count,
+                    (SELECT SUM(CASE WHEN due_at >= '{$esc_now}' AND due_at <= '{$esc_ahead}' THEN 1 ELSE 0 END) FROM $assignments_t WHERE plato_course_id = c.id) AS upcoming_count,
+                    (SELECT SUM(CASE WHEN due_at < '{$esc_now}' THEN 1 ELSE 0 END) FROM $assignments_t WHERE plato_course_id = c.id) AS overdue_count,
+                    (SELECT COUNT(*) FROM $conversations_t WHERE course_id = c.id) AS conversation_count,
+                    (SELECT COUNT(*) FROM $messages_t m INNER JOIN $conversations_t cv ON cv.id = m.conversation_id WHERE cv.course_id = c.id AND m.role = 'user') AS message_count,
+                    (SELECT COUNT(DISTINCT file_name) FROM $notes_t WHERE course_id = c.id) AS notes_count,
+                    (SELECT COUNT(*) FROM $canvas_t WHERE plato_course_id = c.id) AS canvas_pages,
+                    (SELECT MAX(m2.created_at) FROM $messages_t m2 INNER JOIN $conversations_t cv2 ON cv2.id = m2.conversation_id WHERE cv2.course_id = c.id) AS last_activity
+                 FROM $courses_t c
+                 WHERE c.id IN ($ids_in)
+                 ORDER BY c.name ASC",
                 OBJECT_K
             );
 
             foreach ( $all_courses as $c ) {
                 $cid = (int) $c->id;
+                $row = $per_course_rows[ $cid ] ?? null;
                 $course_stats[] = array(
                     'course_id'          => $cid,
                     'course_name'        => $c->name,
                     'course_code'        => $c->course_code,
                     'workflow_state'     => $c->workflow_state,
-                    'assignment_count'   => (int) ( $assign_counts[ $cid ]->assignment_count ?? 0 ),
-                    'upcoming_count'     => (int) ( $assign_counts[ $cid ]->upcoming_count ?? 0 ),
-                    'overdue_count'      => (int) ( $assign_counts[ $cid ]->overdue_count ?? 0 ),
-                    'conversation_count' => (int) ( $convo_counts[ $cid ]->conversation_count ?? 0 ),
-                    'message_count'      => (int) ( $msg_counts[ $cid ]->message_count ?? 0 ),
-                    'notes_count'        => (int) ( $note_counts[ $cid ]->notes_count ?? 0 ),
-                    'canvas_pages'       => (int) ( $canvas_counts[ $cid ]->canvas_pages ?? 0 ),
-                    'last_activity'      => $last_activity[ $cid ]->last_activity ?? null,
+                    'assignment_count'   => (int) ( $row->assignment_count ?? 0 ),
+                    'upcoming_count'     => (int) ( $row->upcoming_count ?? 0 ),
+                    'overdue_count'      => (int) ( $row->overdue_count ?? 0 ),
+                    'conversation_count' => (int) ( $row->conversation_count ?? 0 ),
+                    'message_count'      => (int) ( $row->message_count ?? 0 ),
+                    'notes_count'        => (int) ( $row->notes_count ?? 0 ),
+                    'canvas_pages'       => (int) ( $row->canvas_pages ?? 0 ),
+                    'last_activity'      => $row->last_activity ?? null,
                 );
             }
         }
 
-        // 8. Activity timeline — last 14 days
-        $fourteen_days_ago = gmdate( 'Y-m-d', time() - 14 * 86400 );
+        // ── Query 5: Activity timeline — last 14 days ──
         $timeline_raw = $wpdb->get_results( $wpdb->prepare(
             "SELECT DATE(m.created_at) AS date,
                 COUNT(m.id) AS messages,
@@ -1084,7 +1015,6 @@ class Plato_Database {
             $fourteen_days_ago
         ), OBJECT_K );
 
-        // Zero-fill missing days
         $timeline = array();
         for ( $i = 13; $i >= 0; $i-- ) {
             $date = gmdate( 'Y-m-d', time() - $i * 86400 );
@@ -1097,29 +1027,29 @@ class Plato_Database {
 
         return array(
             'overview' => array(
-                'total_courses'        => (int) $course_row->total_courses,
-                'active_courses'       => (int) $course_row->active_courses,
-                'concluded_courses'    => (int) $course_row->concluded_courses,
-                'total_assignments'    => (int) $assign_row->total_assignments,
-                'upcoming_assignments' => (int) $assign_row->upcoming_assignments,
-                'overdue_assignments'  => (int) $assign_row->overdue_assignments,
+                'total_courses'        => (int) ( $overview->total_courses ?? 0 ),
+                'active_courses'       => (int) ( $overview->active_courses ?? 0 ),
+                'concluded_courses'    => (int) ( $overview->concluded_courses ?? 0 ),
+                'total_assignments'    => (int) ( $overview->total_assignments ?? 0 ),
+                'upcoming_assignments' => (int) ( $overview->upcoming_assignments ?? 0 ),
+                'overdue_assignments'  => (int) ( $overview->overdue_assignments ?? 0 ),
             ),
             'engagement' => array(
                 'total_conversations'           => $total_convos,
                 'total_messages'                => $total_msgs,
-                'socratic_conversations'        => (int) $convo_row->socratic_conversations,
-                'eli5_conversations'            => (int) $convo_row->eli5_conversations,
-                'conversations_this_week'       => (int) $convo_row->conversations_this_week,
-                'messages_this_week'            => (int) $msg_row->messages_this_week,
+                'socratic_conversations'        => (int) ( $engage->socratic_conversations ?? 0 ),
+                'eli5_conversations'            => (int) ( $engage->eli5_conversations ?? 0 ),
+                'conversations_this_week'       => (int) ( $engage->conversations_this_week ?? 0 ),
+                'messages_this_week'            => (int) ( $engage->messages_this_week ?? 0 ),
                 'avg_messages_per_conversation' => $avg_msgs,
                 'streak_days'                   => $streak,
             ),
             'knowledge_base' => array(
-                'canvas_pages_synced'    => $canvas_stats['pages_synced'],
-                'canvas_total_chunks'    => $canvas_stats['total_chunks'],
-                'study_notes_uploaded'   => (int) $notes_row->study_notes_uploaded,
-                'study_notes_processed'  => (int) $notes_row->study_notes_processed,
-                'study_notes_pending'    => (int) $notes_row->study_notes_pending,
+                'canvas_pages_synced'    => (int) ( $overview->canvas_pages_synced ?? 0 ),
+                'canvas_total_chunks'    => (int) ( $overview->canvas_total_chunks ?? 0 ),
+                'study_notes_uploaded'   => (int) ( $overview->study_notes_uploaded ?? 0 ),
+                'study_notes_processed'  => (int) ( $overview->study_notes_processed ?? 0 ),
+                'study_notes_pending'    => (int) ( $overview->study_notes_pending ?? 0 ),
             ),
             'course_stats'      => $course_stats,
             'activity_timeline' => $timeline,

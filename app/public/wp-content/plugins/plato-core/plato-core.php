@@ -59,6 +59,12 @@ add_action( 'admin_init', 'plato_maybe_migrate' );
 add_action( 'rest_api_init', 'plato_maybe_migrate', 5 );
 
 function plato_maybe_migrate(): void {
+    static $checked = false;
+    if ( $checked ) {
+        return;
+    }
+    $checked = true;
+
     if ( Plato_Database::get_db_version() !== PLATO_VERSION ) {
         Plato_Database::create_tables();
     }
