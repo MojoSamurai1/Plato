@@ -8,17 +8,14 @@ import {
   courses,
   canvas,
   type CourseContentResponse,
-  type CourseDetail,
-  type CourseModule,
+  type ModuleSummary,
   type Assignment,
-  type StudyNote,
 } from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
 
 const CANVAS_BASE = 'https://mylearn.torrens.edu.au';
 
 function parseCanvasPageUrl(contentKey: string): string | null {
-  // content_key format: "page:{canvas_course_id}:{page_url}"
   const parts = contentKey.split(':');
   if (parts.length >= 3 && parts[0] === 'page') {
     const canvasCourseId = parts[1];
@@ -47,6 +44,11 @@ function getDueStatus(dueAt: string | null): 'overdue' | 'soon' | 'normal' | 'no
   return 'normal';
 }
 
+/** Lookup map keyed by file_name for instant content access */
+interface ContentMap {
+  [fileName: string]: { summary: string; content: string; status: string };
+}
+
 function CourseDetailContent() {
   const params = useParams();
   const router = useRouter();
@@ -54,21 +56,40 @@ function CourseDetailContent() {
   const courseId = Number(params.courseId);
 
   const [data, setData] = useState<CourseContentResponse | null>(null);
+  const [contentMap, setContentMap] = useState<ContentMap>({});
+  const [contentLoaded, setContentLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedAssignment, setExpandedAssignment] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
+  // Load course structure + all content in parallel
   useEffect(() => {
-    courses
-      .content(courseId)
-      .then((res) => {
-        setData(res);
-        // Auto-expand all modules
-        const allModules = new Set(res.modules.map((m) => m.module_name));
+    const loadCourse = courses.content(courseId);
+    const loadContent = courses.moduleSummaries(courseId);
+
+    Promise.all([loadCourse, loadContent])
+      .then(([courseData, summariesData]) => {
+        setData(courseData);
+        const allModules = new Set(courseData.modules.map((m) => m.module_name));
         setExpandedModules(allModules);
+
+        // Build a flat lookup map for instant page expansion
+        const map: ContentMap = {};
+        for (const mod of summariesData.modules) {
+          for (const page of mod.pages) {
+            map[page.file_name] = {
+              summary: page.summary,
+              content: page.content,
+              status: page.status,
+            };
+          }
+        }
+        setContentMap(map);
+        setContentLoaded(true);
       })
       .catch((err) => setError(err.message || 'Failed to load course'))
       .finally(() => setLoading(false));
@@ -83,17 +104,51 @@ function CourseDetailContent() {
     });
   }
 
+  function togglePage(fileName: string) {
+    setExpandedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileName)) next.delete(fileName);
+      else next.add(fileName);
+      return next;
+    });
+  }
+
+  /** Build the file_name key matching what class-canvas.php stores */
+  function buildFileName(moduleName: string, pageTitle: string): string {
+    const raw = `canvas-${moduleName}-${pageTitle}`;
+    return raw
+      .toLowerCase()
+      .replace(/[^a-z0-9\-_.]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
   async function handleContentSync() {
     setSyncing(true);
     setSyncMsg('');
     try {
       const res = await canvas.contentSync();
       setSyncMsg(res.message);
-      // Reload course data
-      const updated = await courses.content(courseId);
+      // Reload both course data and content
+      const [updated, summaries] = await Promise.all([
+        courses.content(courseId),
+        courses.moduleSummaries(courseId),
+      ]);
       setData(updated);
       const allModules = new Set(updated.modules.map((m) => m.module_name));
       setExpandedModules(allModules);
+
+      const map: ContentMap = {};
+      for (const mod of summaries.modules) {
+        for (const page of mod.pages) {
+          map[page.file_name] = {
+            summary: page.summary,
+            content: page.content,
+            status: page.status,
+          };
+        }
+      }
+      setContentMap(map);
     } catch (err) {
       setSyncMsg(err instanceof Error ? err.message : 'Sync failed');
     } finally {
@@ -125,7 +180,6 @@ function CourseDetailContent() {
   const { course, modules, assignments, study_notes, total_pages } = data;
   const isConcluded = course.end_at && new Date(course.end_at) < new Date();
 
-  // Sort assignments by due date
   const sortedAssignments = [...assignments].sort((a, b) => {
     if (!a.due_at && !b.due_at) return 0;
     if (!a.due_at) return 1;
@@ -298,35 +352,102 @@ function CourseDetailContent() {
                     <div className="border-t border-gray-100 dark:border-gray-800">
                       {mod.pages.map((page) => {
                         const canvasUrl = parseCanvasPageUrl(page.content_key);
+                        const fileName = buildFileName(mod.module_name, page.title);
+                        const isPageExpanded = expandedPages.has(fileName);
+                        const cached = contentMap[fileName];
+
                         return (
-                          <div
-                            key={page.id}
-                            className="flex items-center justify-between px-4 py-2.5 pl-10 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <svg className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                                {page.title}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <span className="text-[10px] text-gray-400">
-                                {page.chunks_created} chunk{page.chunks_created !== 1 ? 's' : ''}
-                              </span>
-                              {canvasUrl && (
-                                <a
-                                  href={canvasUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
-                                  onClick={(e) => e.stopPropagation()}
+                          <div key={page.id}>
+                            {/* Page row — clickable to expand content */}
+                            <button
+                              onClick={() => togglePage(fileName)}
+                              className="w-full flex items-center justify-between px-4 py-2.5 pl-10 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition text-left"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <svg
+                                  className={`w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0 transition-transform ${
+                                    isPageExpanded ? 'rotate-90' : ''
+                                  }`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
                                 >
-                                  Read in Canvas &nearr;
-                                </a>
-                              )}
-                            </div>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                                  {page.title}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className="text-[10px] text-gray-400">
+                                  {page.chunks_created} chunk{page.chunks_created !== 1 ? 's' : ''}
+                                </span>
+                                {canvasUrl && (
+                                  <a
+                                    href={canvasUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Open in Canvas"
+                                  >
+                                    &nearr;
+                                  </a>
+                                )}
+                              </div>
+                            </button>
+
+                            {/* Expanded content — instant, no loading needed */}
+                            {isPageExpanded && (
+                              <div className="mx-4 ml-10 mb-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                {!contentLoaded ? (
+                                  <div className="px-4 py-6 text-center">
+                                    <div className="animate-pulse text-sm text-gray-400">Loading content...</div>
+                                  </div>
+                                ) : cached && (cached.summary || cached.content) ? (
+                                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {cached.summary && (
+                                      <div className="px-4 py-3 bg-indigo-50/50 dark:bg-indigo-900/10">
+                                        <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-1">
+                                          Summary
+                                        </p>
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                          {cached.summary}
+                                        </p>
+                                      </div>
+                                    )}
+                                    {cached.content && (
+                                      <div className="px-4 py-3">
+                                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                                          Full Content
+                                        </p>
+                                        <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                          {cached.content}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="px-4 py-4 text-center text-sm text-gray-400">
+                                    No content available for this page yet.
+                                    {canvasUrl && (
+                                      <>
+                                        {' '}
+                                        <a
+                                          href={canvasUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-indigo-500 hover:underline"
+                                        >
+                                          Read in Canvas &nearr;
+                                        </a>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

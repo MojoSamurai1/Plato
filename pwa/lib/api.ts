@@ -186,12 +186,40 @@ export interface CourseContentResponse {
   total_pages: number;
 }
 
+export interface PageContentResponse {
+  file_name: string;
+  content: string;
+  summary: string;
+  total_chunks: number;
+  status: string;
+}
+
+export interface ModulePageSummary {
+  title: string;
+  file_name: string;
+  summary: string;
+  content: string;
+  status: string;
+}
+
+export interface ModuleSummary {
+  module_name: string;
+  pages: ModulePageSummary[];
+  summary: string;
+}
+
 export const courses = {
   list(): Promise<CoursesResponse> {
     return apiFetch('/courses');
   },
   content(courseId: number): Promise<CourseContentResponse> {
     return apiFetch(`/courses/${courseId}/content`);
+  },
+  pageContent(courseId: number, fileName: string): Promise<PageContentResponse> {
+    return apiFetch(`/courses/${courseId}/page-content?file_name=${encodeURIComponent(fileName)}`);
+  },
+  moduleSummaries(courseId: number): Promise<{ modules: ModuleSummary[] }> {
+    return apiFetch(`/courses/${courseId}/module-summaries`);
   },
 };
 

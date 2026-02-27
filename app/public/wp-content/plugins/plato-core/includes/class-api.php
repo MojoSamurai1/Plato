@@ -134,6 +134,19 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        // ─── Course Content Reading ─────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/courses/(?P<id>\d+)/page-content', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_page_content_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/courses/(?P<id>\d+)/module-summaries', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_module_summaries_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Training Zone ──────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/training/modules', array(
             'methods'             => 'GET',
@@ -475,6 +488,111 @@ class Plato_API {
             'study_notes'  => $study_notes,
             'total_pages'  => count( $items ),
         ), 200 );
+    }
+
+    // ─── Course Content Reading Handlers ────────────────────────────────────
+
+    public function get_page_content_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'id' ) );
+        $file_name = sanitize_text_field( $request->get_param( 'file_name' ) ?? '' );
+
+        if ( ! $course_id || empty( $file_name ) ) {
+            return new WP_Error( 'plato_missing_params', 'course id and file_name are required.', array( 'status' => 400 ) );
+        }
+
+        $chunks = Plato_Database::get_study_note_content( $user_id, $course_id, $file_name );
+
+        // Combine chunks into full content.
+        $content = '';
+        $summary = '';
+        foreach ( $chunks as $chunk ) {
+            if ( $chunk->content ) {
+                $content .= $chunk->content . "\n\n";
+            }
+            if ( $chunk->summary ) {
+                $summary .= $chunk->summary . "\n\n";
+            }
+        }
+
+        return new WP_REST_Response( array(
+            'file_name'    => $file_name,
+            'content'      => trim( $content ),
+            'summary'      => trim( $summary ),
+            'total_chunks' => count( $chunks ),
+            'status'       => ! empty( $chunks ) ? $chunks[0]->status : 'not_found',
+        ), 200 );
+    }
+
+    public function get_module_summaries_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = absint( $request->get_param( 'id' ) );
+        if ( ! $course_id ) {
+            return new WP_Error( 'plato_missing_params', 'Course ID is required.', array( 'status' => 400 ) );
+        }
+
+        // Get all canvas content items for this course.
+        $items = Plato_Database::get_canvas_content_for_course( $user_id, $course_id );
+
+        // Single query: fetch ALL study note chunks for this course at once.
+        $all_notes = Plato_Database::get_all_study_notes_for_course( $user_id, $course_id );
+
+        // Group by module and attach content from the batch.
+        $modules = array();
+        foreach ( $items as $item ) {
+            $mod = $item->module_name ?: 'Ungrouped';
+            if ( ! isset( $modules[ $mod ] ) ) {
+                $modules[ $mod ] = array(
+                    'module_name' => $mod,
+                    'pages'       => array(),
+                    'summary'     => '',
+                );
+            }
+
+            $file_name = sanitize_file_name( "canvas-{$mod}-{$item->title}" );
+            $chunks = $all_notes[ $file_name ] ?? array();
+
+            $page_summary = '';
+            $page_content = '';
+            $status = 'not_found';
+            foreach ( $chunks as $chunk ) {
+                if ( $chunk->summary ) {
+                    $page_summary .= $chunk->summary . "\n";
+                }
+                if ( $chunk->content ) {
+                    $page_content .= $chunk->content . "\n\n";
+                }
+                $status = $chunk->status;
+            }
+
+            $modules[ $mod ]['pages'][] = array(
+                'title'     => $item->title,
+                'file_name' => $file_name,
+                'summary'   => trim( $page_summary ),
+                'content'   => trim( $page_content ),
+                'status'    => $status,
+            );
+
+            if ( $page_summary ) {
+                $modules[ $mod ]['summary'] .= "**{$item->title}**: " . trim( $page_summary ) . "\n\n";
+            }
+        }
+
+        $result = array();
+        foreach ( $modules as $mod ) {
+            $mod['summary'] = trim( $mod['summary'] );
+            $result[] = $mod;
+        }
+
+        return new WP_REST_Response( array( 'modules' => $result ), 200 );
     }
 
     // ─── Chat Handlers ──────────────────────────────────────────────────────

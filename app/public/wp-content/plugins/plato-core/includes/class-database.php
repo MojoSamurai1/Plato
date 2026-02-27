@@ -622,6 +622,29 @@ class Plato_Database {
     }
 
     /**
+     * Batch-fetch all study note chunks for a course, grouped by file_name.
+     */
+    public static function get_all_study_notes_for_course( int $user_id, int $course_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_study_notes';
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT file_name, chunk_index, content, summary, status
+             FROM $table
+             WHERE user_id = %d AND course_id = %d
+             ORDER BY file_name ASC, chunk_index ASC",
+            $user_id,
+            $course_id
+        ) );
+
+        $grouped = array();
+        foreach ( $rows as $row ) {
+            $grouped[ $row->file_name ][] = $row;
+        }
+        return $grouped;
+    }
+
+    /**
      * Get study note content for a specific canvas content item (by file_name pattern).
      */
     public static function get_study_note_content( int $user_id, int $course_id, string $file_name ): array {
