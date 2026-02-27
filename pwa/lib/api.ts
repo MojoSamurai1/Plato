@@ -25,9 +25,9 @@ async function apiFetch<T>(
   }
 
   // Abort after timeout to prevent indefinite hangs.
-  // Long-running endpoints (Canvas sync, content sync) get 120s; normal calls get 15s.
-  const isLongRunning = /\/(canvas|content-sync)/.test(endpoint);
-  const timeoutMs = isLongRunning ? 120000 : 15000;
+  // Long-running endpoints (Canvas sync, content sync, training generate) get 120s.
+  const isLongRunning = /\/(canvas|content-sync|training\/generate)/.test(endpoint);
+  const timeoutMs = isLongRunning ? 120000 : 60000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
