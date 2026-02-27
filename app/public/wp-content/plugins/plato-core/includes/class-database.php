@@ -612,7 +612,7 @@ class Plato_Database {
         $table = $wpdb->prefix . 'plato_canvas_content';
 
         return $wpdb->get_results( $wpdb->prepare(
-            "SELECT id, content_type, title, module_name, chunks_created, synced_at
+            "SELECT id, content_type, title, module_name, content_key, chunks_created, synced_at
              FROM $table
              WHERE user_id = %d AND plato_course_id = %d
              ORDER BY module_name ASC, title ASC",

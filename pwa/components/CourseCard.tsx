@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Course } from '@/lib/api';
 
 interface CourseCardProps {
@@ -9,7 +10,10 @@ export default function CourseCard({ course }: CourseCardProps) {
     course.end_at && new Date(course.end_at) < new Date();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition">
+    <Link
+      href={`/courses/${course.id}`}
+      className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 transition"
+    >
       <div className="flex items-start justify-between mb-3">
         <span className="inline-block bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold px-2.5 py-1 rounded-md">
           {course.course_code}
@@ -34,6 +38,6 @@ export default function CourseCard({ course }: CourseCardProps) {
           {course.assignment_count === 1 ? 'assignment' : 'assignments'}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }

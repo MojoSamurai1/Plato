@@ -157,6 +157,7 @@ export interface CourseContentPage {
   id: number;
   title: string;
   content_type: string;
+  content_key: string;
   chunks_created: number;
   synced_at: string;
 }
@@ -166,7 +167,19 @@ export interface CourseModule {
   pages: CourseContentPage[];
 }
 
+export interface CourseDetail {
+  id: number;
+  canvas_course_id: number;
+  name: string;
+  course_code: string;
+  workflow_state: string;
+  start_at: string | null;
+  end_at: string | null;
+  synced_at: string | null;
+}
+
 export interface CourseContentResponse {
+  course: CourseDetail;
   modules: CourseModule[];
   assignments: Assignment[];
   study_notes: StudyNote[];
@@ -192,6 +205,7 @@ export interface Assignment {
   course_name: string;
   course_code: string;
   name: string;
+  description: string | null;
   due_at: string | null;
   points_possible: number | null;
   submission_types: string;

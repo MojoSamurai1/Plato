@@ -412,6 +412,18 @@ class Plato_API {
             return new WP_Error( 'plato_missing_course', 'Course ID is required.', array( 'status' => 400 ) );
         }
 
+        // Get the course object for metadata.
+        global $wpdb;
+        $course = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}plato_courses WHERE id = %d AND user_id = %d",
+            $course_id,
+            $user_id
+        ) );
+
+        if ( ! $course ) {
+            return new WP_Error( 'plato_not_found', 'Course not found.', array( 'status' => 404 ) );
+        }
+
         // Get canvas content items grouped by module.
         $items = Plato_Database::get_canvas_content_for_course( $user_id, $course_id );
 
@@ -426,6 +438,7 @@ class Plato_API {
                 'id'             => (int) $item->id,
                 'title'          => $item->title,
                 'content_type'   => $item->content_type,
+                'content_key'    => $item->content_key,
                 'chunks_created' => (int) $item->chunks_created,
                 'synced_at'      => $item->synced_at,
             );
@@ -447,6 +460,16 @@ class Plato_API {
         $study_notes = Plato_Database::get_study_note_files( $user_id, $course_id );
 
         return new WP_REST_Response( array(
+            'course'       => array(
+                'id'               => (int) $course->id,
+                'canvas_course_id' => (int) $course->canvas_course_id,
+                'name'             => $course->name,
+                'course_code'      => $course->course_code,
+                'workflow_state'   => $course->workflow_state,
+                'start_at'         => $course->start_at,
+                'end_at'           => $course->end_at,
+                'synced_at'        => $course->synced_at,
+            ),
             'modules'      => $module_list,
             'assignments'  => $assignments,
             'study_notes'  => $study_notes,
