@@ -24,9 +24,12 @@ async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Abort after 15 seconds to prevent indefinite hangs
+  // Abort after timeout to prevent indefinite hangs.
+  // Long-running endpoints (Canvas sync, content sync) get 120s; normal calls get 15s.
+  const isLongRunning = /\/(canvas|content-sync)/.test(endpoint);
+  const timeoutMs = isLongRunning ? 120000 : 15000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
   try {

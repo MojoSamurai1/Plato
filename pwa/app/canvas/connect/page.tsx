@@ -12,8 +12,6 @@ function CanvasConnectContent() {
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
-    courses_synced?: number;
-    assignments_synced?: number;
   } | null>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -63,7 +61,7 @@ function CanvasConnectContent() {
               Canvas Connected!
             </h2>
             <p className="text-sm text-green-700 dark:text-green-400 mb-4">
-              {result.courses_synced} courses and {result.assignments_synced} assignments synced.
+              {result.message}
             </p>
             <Link
               href="/dashboard"

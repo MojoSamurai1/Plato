@@ -156,6 +156,13 @@ add_action( 'init', function () {
 
 add_action( 'plato_canvas_sync', 'plato_run_canvas_sync' );
 
+// Single-user background sync (triggered by canvas connect).
+add_action( 'plato_canvas_sync_user', function ( int $user_id ): void {
+    $canvas = new Plato_Canvas( $user_id );
+    $canvas->sync_all();
+    $canvas->sync_content();
+} );
+
 function plato_run_canvas_sync(): void {
     $users = get_users( array(
         'meta_key' => 'plato_canvas_token',

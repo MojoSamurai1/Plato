@@ -258,27 +258,26 @@ class Plato_API {
         }
 
         $canvas = new Plato_Canvas( $user_id );
-        $canvas->save_token( $canvas_token );
 
-        $result = $canvas->sync_all();
-        if ( is_wp_error( $result ) ) {
+        // Quick verification first (single API call, ~2s).
+        $verify = $canvas->verify_token( $canvas_token );
+        if ( is_wp_error( $verify ) ) {
             return new WP_REST_Response( array(
                 'success' => false,
-                'message' => 'Token saved but sync failed. Will retry in 6 hours.',
-                'error'   => $result->get_error_message(),
+                'message' => 'Token is invalid or Canvas is unreachable.',
+                'error'   => $verify->get_error_message(),
             ), 200 );
         }
 
+        $canvas->save_token( $canvas_token );
+
+        // Schedule the full sync in the background so we return fast.
+        wp_schedule_single_event( time(), 'plato_canvas_sync_user', array( $user_id ) );
+        spawn_cron();
+
         return new WP_REST_Response( array(
-            'success'            => true,
-            'message'            => sprintf(
-                'Canvas connected. %d courses and %d assignments synced.',
-                $result['courses_synced'],
-                $result['assignments_synced']
-            ),
-            'courses_synced'     => $result['courses_synced'],
-            'assignments_synced' => $result['assignments_synced'],
-            'synced_at'          => $result['synced_at'],
+            'success' => true,
+            'message' => 'Canvas connected! Your courses are syncing in the background — they\'ll appear in a few seconds.',
         ), 200 );
     }
 

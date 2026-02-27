@@ -58,6 +58,17 @@ class Plato_Canvas {
         );
     }
 
+    /**
+     * Quick token verification — hits /users/self (fast, single request).
+     */
+    public function verify_token( string $token ): true|WP_Error {
+        $response = $this->make_request( $token, self::CANVAS_BASE_URL . '/users/self' );
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        return true;
+    }
+
     // ─── Sync Orchestration ──────────────────────────────────────────────────
 
     /**
