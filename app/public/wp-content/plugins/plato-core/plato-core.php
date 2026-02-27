@@ -54,12 +54,15 @@ function plato_activate(): void {
     Plato_Database::create_tables();
 }
 
-// Run migrations on admin_init if DB version changed (handles upgrades).
-add_action( 'admin_init', function () {
+// Run migrations on admin_init or REST API init if DB version changed (handles upgrades).
+add_action( 'admin_init', 'plato_maybe_migrate' );
+add_action( 'rest_api_init', 'plato_maybe_migrate', 5 );
+
+function plato_maybe_migrate(): void {
     if ( Plato_Database::get_db_version() !== PLATO_VERSION ) {
         Plato_Database::create_tables();
     }
-} );
+}
 
 // ─── REST API ────────────────────────────────────────────────────────────────
 
