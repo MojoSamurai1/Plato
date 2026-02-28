@@ -86,19 +86,56 @@ class Plato_Database {
         ) $charset_collate;
 
         CREATE TABLE {$wpdb->prefix}plato_canvas_content (
+            id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id             BIGINT UNSIGNED NOT NULL,
+            canvas_course_id    BIGINT UNSIGNED NOT NULL,
+            plato_course_id     BIGINT UNSIGNED NOT NULL,
+            content_key         VARCHAR(500)    NOT NULL DEFAULT '',
+            content_type        VARCHAR(50)     NOT NULL DEFAULT 'page',
+            title               VARCHAR(255)    NOT NULL DEFAULT '',
+            module_name         VARCHAR(255)    NOT NULL DEFAULT '',
+            chunks_created      INT UNSIGNED    NOT NULL DEFAULT 0,
+            html_content        LONGTEXT                 DEFAULT NULL,
+            embedded_resources  LONGTEXT                 DEFAULT NULL,
+            synced_at           DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY         (id),
+            UNIQUE KEY          user_content (user_id, content_key(191)),
+            KEY                 user_course (user_id, canvas_course_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_canvas_discussions (
             id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id           BIGINT UNSIGNED NOT NULL,
             canvas_course_id  BIGINT UNSIGNED NOT NULL,
             plato_course_id   BIGINT UNSIGNED NOT NULL,
-            content_key       VARCHAR(500)    NOT NULL DEFAULT '',
-            content_type      VARCHAR(50)     NOT NULL DEFAULT 'page',
-            title             VARCHAR(255)    NOT NULL DEFAULT '',
+            canvas_topic_id   BIGINT UNSIGNED NOT NULL,
             module_name       VARCHAR(255)    NOT NULL DEFAULT '',
-            chunks_created    INT UNSIGNED    NOT NULL DEFAULT 0,
+            title             VARCHAR(255)    NOT NULL DEFAULT '',
+            message           LONGTEXT                 DEFAULT NULL,
+            message_plain     LONGTEXT                 DEFAULT NULL,
+            posts_json        LONGTEXT                 DEFAULT NULL,
+            post_count        INT UNSIGNED    NOT NULL DEFAULT 0,
             synced_at         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY       (id),
-            UNIQUE KEY        user_content (user_id, content_key(191)),
-            KEY               user_course (user_id, canvas_course_id)
+            UNIQUE KEY        user_topic (user_id, canvas_topic_id),
+            KEY               user_course (user_id, plato_course_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_canvas_module_progress (
+            id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id           BIGINT UNSIGNED NOT NULL,
+            canvas_course_id  BIGINT UNSIGNED NOT NULL,
+            plato_course_id   BIGINT UNSIGNED NOT NULL,
+            canvas_module_id  BIGINT UNSIGNED NOT NULL,
+            module_name       VARCHAR(255)    NOT NULL DEFAULT '',
+            module_state      VARCHAR(50)     NOT NULL DEFAULT '',
+            completed_at      DATETIME                 DEFAULT NULL,
+            items_total       INT UNSIGNED    NOT NULL DEFAULT 0,
+            items_completed   INT UNSIGNED    NOT NULL DEFAULT 0,
+            synced_at         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY       (id),
+            UNIQUE KEY        user_module (user_id, canvas_module_id),
+            KEY               user_course (user_id, plato_course_id)
         ) $charset_collate;
 
         CREATE TABLE {$wpdb->prefix}plato_assignments (
@@ -612,7 +649,7 @@ class Plato_Database {
         $table = $wpdb->prefix . 'plato_canvas_content';
 
         return $wpdb->get_results( $wpdb->prepare(
-            "SELECT id, content_type, title, module_name, content_key, chunks_created, synced_at
+            "SELECT id, content_type, title, module_name, content_key, chunks_created, html_content, embedded_resources, synced_at
              FROM $table
              WHERE user_id = %d AND plato_course_id = %d
              ORDER BY module_name ASC, title ASC",
@@ -659,6 +696,98 @@ class Plato_Database {
             $user_id,
             $course_id,
             $file_name
+        ) );
+    }
+
+    // ─── Canvas Discussions CRUD ────────────────────────────────────────────
+
+    /**
+     * Insert or update a canvas discussion record.
+     */
+    public static function insert_canvas_discussion( array $data ): int|false {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_discussions';
+
+        $existing_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM $table WHERE user_id = %d AND canvas_topic_id = %d",
+            $data['user_id'],
+            $data['canvas_topic_id']
+        ) );
+
+        if ( $existing_id ) {
+            $data['synced_at'] = current_time( 'mysql', true );
+            $wpdb->update( $table, $data, array( 'id' => $existing_id ) );
+            return (int) $existing_id;
+        }
+
+        $result = $wpdb->insert( $table, $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    /**
+     * Get discussions for a course.
+     */
+    public static function get_discussions_for_course( int $user_id, int $course_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_discussions';
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND plato_course_id = %d ORDER BY module_name ASC, title ASC",
+            $user_id,
+            $course_id
+        ) );
+    }
+
+    // ─── Canvas Module Progress CRUD ────────────────────────────────────────
+
+    /**
+     * Upsert module progress record.
+     */
+    public static function upsert_module_progress( array $data ): int|false {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_module_progress';
+
+        $existing_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM $table WHERE user_id = %d AND canvas_module_id = %d",
+            $data['user_id'],
+            $data['canvas_module_id']
+        ) );
+
+        if ( $existing_id ) {
+            $data['synced_at'] = current_time( 'mysql', true );
+            $wpdb->update( $table, $data, array( 'id' => $existing_id ) );
+            return (int) $existing_id;
+        }
+
+        $result = $wpdb->insert( $table, $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    /**
+     * Get module progress for a course.
+     */
+    public static function get_module_progress( int $user_id, int $course_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_module_progress';
+
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND plato_course_id = %d ORDER BY module_name ASC",
+            $user_id,
+            $course_id
+        ) );
+    }
+
+    /**
+     * Get an assignment by canvas_assignment_id for a user.
+     */
+    public static function get_assignment_by_canvas_id( int $user_id, int $canvas_assignment_id ): object|null {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_assignments';
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND canvas_assignment_id = %d",
+            $user_id,
+            $canvas_assignment_id
         ) );
     }
 

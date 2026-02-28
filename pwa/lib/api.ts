@@ -127,6 +127,10 @@ interface ContentSyncResponse {
   success: boolean;
   pages_synced: number;
   pages_skipped: number;
+  discussions_synced: number;
+  assignments_synced: number;
+  external_links: number;
+  modules_tracked: number;
   total_pages: number;
   total_chunks: number;
   message: string;
@@ -171,12 +175,20 @@ interface CoursesResponse {
   last_sync: string | null;
 }
 
+export interface EmbeddedResource {
+  type: 'youtube' | 'ebook' | 'link';
+  id?: string;
+  url: string;
+}
+
 export interface CourseContentPage {
   id: number;
   title: string;
   content_type: string;
   content_key: string;
   chunks_created: number;
+  html_content: string | null;
+  embedded_resources: EmbeddedResource[] | null;
   synced_at: string;
 }
 
@@ -196,11 +208,39 @@ export interface CourseDetail {
   synced_at: string | null;
 }
 
+export interface DiscussionPost {
+  user_name: string;
+  message: string;
+  created_at: string | null;
+}
+
+export interface CourseDiscussion {
+  id: number;
+  canvas_topic_id: number;
+  module_name: string;
+  title: string;
+  message: string;
+  posts: DiscussionPost[];
+  post_count: number;
+  synced_at: string;
+}
+
+export interface ModuleProgress {
+  canvas_module_id: number;
+  module_name: string;
+  module_state: string;
+  completed_at: string | null;
+  items_total: number;
+  items_completed: number;
+}
+
 export interface CourseContentResponse {
   course: CourseDetail;
   modules: CourseModule[];
   assignments: Assignment[];
   study_notes: StudyNote[];
+  discussions: CourseDiscussion[];
+  module_progress: ModuleProgress[];
   total_pages: number;
 }
 
@@ -218,6 +258,9 @@ export interface ModulePageSummary {
   summary: string;
   content: string;
   status: string;
+  content_type: string;
+  html_content: string | null;
+  embedded_resources: EmbeddedResource[] | null;
 }
 
 export interface ModuleSummary {

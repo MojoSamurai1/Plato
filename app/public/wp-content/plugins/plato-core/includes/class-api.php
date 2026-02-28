@@ -356,14 +356,21 @@ class Plato_API {
 
         $stats = Plato_Database::get_canvas_content_stats( $user_id );
 
+        $new_items = $result['pages_synced'] + $result['discussions_synced'] + $result['assignments_synced'] + $result['external_links'];
+
         return new WP_REST_Response( array(
-            'success'        => true,
-            'pages_synced'   => $result['pages_synced'],
-            'pages_skipped'  => $result['pages_skipped'],
-            'total_pages'    => $stats['pages_synced'],
-            'total_chunks'   => $stats['total_chunks'],
-            'message'        => $result['pages_synced'] > 0
-                ? sprintf( '%d new pages ingested (%d already synced). Background summarization scheduled.', $result['pages_synced'], $result['pages_skipped'] )
+            'success'             => true,
+            'pages_synced'        => $result['pages_synced'],
+            'pages_skipped'       => $result['pages_skipped'],
+            'discussions_synced'  => $result['discussions_synced'],
+            'assignments_synced'  => $result['assignments_synced'],
+            'external_links'      => $result['external_links'],
+            'modules_tracked'     => $result['modules_tracked'],
+            'total_pages'         => $stats['pages_synced'],
+            'total_chunks'        => $stats['total_chunks'],
+            'message'             => $new_items > 0
+                ? sprintf( '%d new items ingested (%d pages, %d discussions, %d assignments). Background summarization scheduled.',
+                    $new_items, $result['pages_synced'], $result['discussions_synced'], $result['assignments_synced'] )
                 : 'All Canvas content is already synced.',
         ), 200 );
     }
@@ -447,12 +454,14 @@ class Plato_API {
                 $modules[ $mod ] = array();
             }
             $modules[ $mod ][] = array(
-                'id'             => (int) $item->id,
-                'title'          => $item->title,
-                'content_type'   => $item->content_type,
-                'content_key'    => $item->content_key,
-                'chunks_created' => (int) $item->chunks_created,
-                'synced_at'      => $item->synced_at,
+                'id'                  => (int) $item->id,
+                'title'               => $item->title,
+                'content_type'        => $item->content_type,
+                'content_key'         => $item->content_key,
+                'chunks_created'      => (int) $item->chunks_created,
+                'html_content'        => $item->html_content ?? null,
+                'embedded_resources'  => $item->embedded_resources ? json_decode( $item->embedded_resources, true ) : null,
+                'synced_at'           => $item->synced_at,
             );
         }
 
@@ -471,8 +480,38 @@ class Plato_API {
         // Get study notes for this course.
         $study_notes = Plato_Database::get_study_note_files( $user_id, $course_id );
 
+        // Get discussions for this course.
+        $discussions_raw = Plato_Database::get_discussions_for_course( $user_id, $course_id );
+        $discussions = array();
+        foreach ( $discussions_raw as $d ) {
+            $discussions[] = array(
+                'id'              => (int) $d->id,
+                'canvas_topic_id' => (int) $d->canvas_topic_id,
+                'module_name'     => $d->module_name,
+                'title'           => $d->title,
+                'message'         => $d->message_plain,
+                'posts'           => json_decode( $d->posts_json, true ) ?: array(),
+                'post_count'      => (int) $d->post_count,
+                'synced_at'       => $d->synced_at,
+            );
+        }
+
+        // Get module progress for this course.
+        $progress_raw = Plato_Database::get_module_progress( $user_id, $course_id );
+        $module_progress = array();
+        foreach ( $progress_raw as $p ) {
+            $module_progress[] = array(
+                'canvas_module_id' => (int) $p->canvas_module_id,
+                'module_name'      => $p->module_name,
+                'module_state'     => $p->module_state,
+                'completed_at'     => $p->completed_at,
+                'items_total'      => (int) $p->items_total,
+                'items_completed'  => (int) $p->items_completed,
+            );
+        }
+
         return new WP_REST_Response( array(
-            'course'       => array(
+            'course'          => array(
                 'id'               => (int) $course->id,
                 'canvas_course_id' => (int) $course->canvas_course_id,
                 'name'             => $course->name,
@@ -482,10 +521,12 @@ class Plato_API {
                 'end_at'           => $course->end_at,
                 'synced_at'        => $course->synced_at,
             ),
-            'modules'      => $module_list,
-            'assignments'  => $assignments,
-            'study_notes'  => $study_notes,
-            'total_pages'  => count( $items ),
+            'modules'         => $module_list,
+            'assignments'     => $assignments,
+            'study_notes'     => $study_notes,
+            'discussions'     => $discussions,
+            'module_progress' => $module_progress,
+            'total_pages'     => count( $items ),
         ), 200 );
     }
 
@@ -573,11 +614,14 @@ class Plato_API {
             }
 
             $modules[ $mod ]['pages'][] = array(
-                'title'     => $item->title,
-                'file_name' => $file_name,
-                'summary'   => trim( $page_summary ),
-                'content'   => trim( $page_content ),
-                'status'    => $status,
+                'title'              => $item->title,
+                'file_name'          => $file_name,
+                'summary'            => trim( $page_summary ),
+                'content'            => trim( $page_content ),
+                'status'             => $status,
+                'content_type'       => $item->content_type,
+                'html_content'       => $item->html_content ?? null,
+                'embedded_resources' => $item->embedded_resources ? json_decode( $item->embedded_resources, true ) : null,
             );
 
             if ( $page_summary ) {
