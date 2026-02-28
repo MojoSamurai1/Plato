@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { notes as notesApi, courses as coursesApi, type StudyNote, type Course } from '@/lib/api';
+import { notes as notesApi, courses as coursesApi, type StudyNote, type Course, type PageContentResponse } from '@/lib/api';
 
 function NotesContent() {
   const [courseList, setCourseList] = useState<Course[]>([]);
@@ -14,6 +14,9 @@ function NotesContent() {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [expandedNote, setExpandedNote] = useState<string | null>(null);
+  const [noteContent, setNoteContent] = useState<Record<string, PageContentResponse>>({});
+  const [loadingContent, setLoadingContent] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -116,8 +119,36 @@ function NotesContent() {
       setNotesList((prev) =>
         prev.filter((n) => !(n.file_name === fileName && n.course_id === courseId))
       );
+      // Clear expanded state if this note was expanded.
+      if (expandedNote === `${fileName}:${courseId}`) {
+        setExpandedNote(null);
+      }
     } catch {
       // handled
+    }
+  }
+
+  async function toggleNote(fileName: string, courseId: number) {
+    const key = `${fileName}:${courseId}`;
+
+    if (expandedNote === key) {
+      setExpandedNote(null);
+      return;
+    }
+
+    setExpandedNote(key);
+
+    // Fetch content if not already cached.
+    if (!noteContent[key]) {
+      setLoadingContent(key);
+      try {
+        const res = await coursesApi.pageContent(courseId, fileName);
+        setNoteContent((prev) => ({ ...prev, [key]: res }));
+      } catch {
+        // Show empty state
+      } finally {
+        setLoadingContent(null);
+      }
     }
   }
 
@@ -229,76 +260,149 @@ function NotesContent() {
           </div>
         ) : (
           <div className="space-y-3">
-            {notesList.map((note) => (
-              <div
-                key={`${note.file_name}-${note.course_id}`}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4"
-              >
-                {/* File type icon */}
+            {notesList.map((note) => {
+              const noteKey = `${note.file_name}:${note.course_id}`;
+              const isExpanded = expandedNote === noteKey;
+              const cached = noteContent[noteKey];
+              const isLoadingThis = loadingContent === noteKey;
+              const isCanvas = note.file_type === 'canvas';
+
+              return (
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold uppercase ${
-                    note.file_type === 'pdf'
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
-                  }`}
+                  key={noteKey}
+                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
                 >
-                  {note.file_type}
-                </div>
-
-                {/* File info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {note.file_name}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>{note.course_code}</span>
-                    <span>&middot;</span>
-                    <span>{formatSize(Number(note.file_size))}</span>
-                    {Number(note.total_chunks) > 0 && (
-                      <>
-                        <span>&middot;</span>
-                        <span>
-                          {note.completed_chunks}/{note.total_chunks} chunks
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Status badge */}
-                <div className="flex items-center gap-2">
-                  {note.status === 'completed' && (
-                    <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
-                      Ready
-                    </span>
-                  )}
-                  {(note.status === 'pending' || note.status === 'processing') && (
-                    <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
-                      Processing...
-                    </span>
-                  )}
-                  {note.status === 'error' && (
-                    <span
-                      className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full"
-                      title={note.error_message ?? 'Unknown error'}
-                    >
-                      Error
-                    </span>
-                  )}
-
-                  {/* Delete button */}
-                  <button
-                    onClick={() => handleDelete(note.file_name, note.course_id)}
-                    className="text-gray-400 hover:text-red-500 transition p-1"
-                    title="Delete"
+                  <div
+                    className="p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
+                    onClick={() => toggleNote(note.file_name, note.course_id)}
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    {/* Expand chevron */}
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
+                        isExpanded ? 'rotate-90' : ''
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                  </button>
+
+                    {/* File type icon */}
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold uppercase flex-shrink-0 ${
+                        isCanvas
+                          ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                          : note.file_type === 'pdf'
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                      }`}
+                    >
+                      {isCanvas ? 'LMS' : note.file_type}
+                    </div>
+
+                    {/* File info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {note.file_name}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span>{note.course_code}</span>
+                        <span>&middot;</span>
+                        <span>{formatSize(Number(note.file_size))}</span>
+                        {Number(note.total_chunks) > 0 && (
+                          <>
+                            <span>&middot;</span>
+                            <span>
+                              {note.completed_chunks}/{note.total_chunks} chunks
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status badge */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {note.status === 'completed' && (
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
+                          Ready
+                        </span>
+                      )}
+                      {(note.status === 'pending' || note.status === 'processing') && (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
+                          Processing...
+                        </span>
+                      )}
+                      {note.status === 'error' && (
+                        <span
+                          className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full"
+                          title={note.error_message ?? 'Unknown error'}
+                        >
+                          Error
+                        </span>
+                      )}
+
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(note.file_name, note.course_id);
+                        }}
+                        className="text-gray-400 hover:text-red-500 transition p-1"
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 dark:border-gray-700">
+                      {isLoadingThis ? (
+                        <div className="px-4 py-8 text-center">
+                          <div className="animate-pulse text-sm text-gray-400">Loading content...</div>
+                        </div>
+                      ) : cached ? (
+                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {cached.summary && (
+                            <div className="px-4 py-3 bg-indigo-50/50 dark:bg-indigo-900/10">
+                              <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-1">
+                                Summary
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                {cached.summary}
+                              </p>
+                            </div>
+                          )}
+                          {cached.content ? (
+                            <div className="px-4 py-3">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                                Content
+                              </p>
+                              <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+                                {cached.content}
+                              </div>
+                            </div>
+                          ) : !cached.summary ? (
+                            <div className="px-4 py-6 text-center text-sm text-gray-400">
+                              Content is still being processed. Check back shortly.
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-gray-400">
+                          No content available yet. The note may still be processing.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
