@@ -178,6 +178,12 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        register_rest_route( self::NAMESPACE, '/training/learning-outcomes/(?P<course_id>\d+)/(?P<module_name>[^/]+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_learning_outcomes_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Settings ──────────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/settings/llm', array(
             'methods'             => 'GET',
@@ -1436,6 +1442,124 @@ class Plato_API {
             'mastered_modules' => $mastered_count,
             'modules'          => $modules,
         ), 200 );
+    }
+
+    public function get_learning_outcomes_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id   = absint( $request->get_param( 'course_id' ) );
+        $module_name = urldecode( $request->get_param( 'module_name' ) );
+
+        if ( ! $course_id || empty( $module_name ) ) {
+            return new WP_Error( 'plato_missing_params', 'course_id and module_name are required.', array( 'status' => 400 ) );
+        }
+
+        // 1. Check cache
+        $cached = Plato_Database::get_learning_outcomes( $user_id, $course_id, $module_name );
+        if ( $cached ) {
+            $outcomes = json_decode( $cached->outcomes, true ) ?: array();
+            return new WP_REST_Response( array(
+                'outcomes' => $outcomes,
+                'source'   => $cached->source,
+            ), 200 );
+        }
+
+        // 2. Try to extract from Canvas HTML
+        $outcomes = $this->extract_outcomes_from_html( $user_id, $course_id, $module_name );
+        if ( ! empty( $outcomes ) ) {
+            Plato_Database::upsert_learning_outcomes( $user_id, $course_id, $module_name, $outcomes, 'canvas' );
+            return new WP_REST_Response( array(
+                'outcomes' => $outcomes,
+                'source'   => 'canvas',
+            ), 200 );
+        }
+
+        // 3. LLM fallback
+        $content = Plato_Database::get_module_content_for_training( $user_id, $course_id, $module_name );
+        if ( empty( $content ) ) {
+            return new WP_REST_Response( array( 'outcomes' => array(), 'source' => null ), 200 );
+        }
+
+        $api_key = Plato_LLM::get_api_key();
+        if ( ! $api_key ) {
+            return new WP_REST_Response( array( 'outcomes' => array(), 'source' => null ), 200 );
+        }
+
+        set_time_limit( 60 );
+
+        $system = "You are an expert curriculum designer. Extract 4-8 concise learning outcomes from the provided course module content.\n\n"
+                . "Each outcome should start with an action verb (e.g. Explain, Analyse, Apply, Evaluate, Compare).\n"
+                . "Keep each outcome to 1-2 sentences maximum.\n\n"
+                . "RESPOND WITH VALID JSON ONLY:\n"
+                . '{"outcomes": [{"outcome": "..."}, {"outcome": "..."}]}';
+
+        $messages = array( array( 'role' => 'user', 'content' => "Extract learning outcomes from this module content:\n\n" . mb_substr( $content, 0, 8000 ) ) );
+
+        $provider = Plato_LLM::get_provider();
+        $model    = Plato_LLM::get_model();
+
+        if ( $provider === Plato_LLM::PROVIDER_ANTHROPIC ) {
+            $result = self::call_llm_anthropic( $api_key, $model, $system, $messages );
+        } else {
+            $result = self::call_llm_openai( $api_key, $model, $system, $messages );
+        }
+
+        if ( is_wp_error( $result ) ) {
+            return new WP_REST_Response( array( 'outcomes' => array(), 'source' => null ), 200 );
+        }
+
+        $response_text = $result['content'];
+        if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $response_text, $matches ) ) {
+            $response_text = trim( $matches[1] );
+        }
+
+        $parsed = json_decode( $response_text, true );
+        $ai_outcomes = $parsed['outcomes'] ?? array();
+
+        if ( ! empty( $ai_outcomes ) ) {
+            Plato_Database::upsert_learning_outcomes( $user_id, $course_id, $module_name, $ai_outcomes, 'ai' );
+        }
+
+        return new WP_REST_Response( array(
+            'outcomes' => $ai_outcomes,
+            'source'   => 'ai',
+        ), 200 );
+    }
+
+    private function extract_outcomes_from_html( int $user_id, int $course_id, string $module_name ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_canvas_content';
+
+        $pages = $wpdb->get_results( $wpdb->prepare(
+            "SELECT html_content FROM $table WHERE user_id = %d AND plato_course_id = %d AND module_name = %s AND html_content IS NOT NULL",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+
+        $outcomes = array();
+        foreach ( $pages as $page ) {
+            if ( empty( $page->html_content ) ) continue;
+
+            // Look for common patterns: "Learning Outcomes", "Learning Objectives", "By the end of this module"
+            if ( preg_match( '/(learning\s+(?:outcomes?|objectives?)|by\s+the\s+end\s+of\s+this)/i', $page->html_content ) ) {
+                // Extract list items after the heading
+                if ( preg_match_all( '/<li[^>]*>(.*?)<\/li>/si', $page->html_content, $li_matches ) ) {
+                    foreach ( $li_matches[1] as $li ) {
+                        $text = trim( strip_tags( $li ) );
+                        if ( strlen( $text ) > 10 && strlen( $text ) < 500 ) {
+                            $outcomes[] = array( 'outcome' => $text );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Only return if we found a meaningful set (3+)
+        return count( $outcomes ) >= 3 ? $outcomes : array();
     }
 
     // ─── Training Zone Helpers ───────────────────────────────────────────────

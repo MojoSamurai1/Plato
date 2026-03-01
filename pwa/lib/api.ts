@@ -589,6 +589,15 @@ export interface TrainingProgressResponse {
   modules: TrainingModuleInfo[];
 }
 
+export interface LearningOutcome {
+  outcome: string;
+}
+
+export interface LearningOutcomesResponse {
+  outcomes: LearningOutcome[];
+  source: 'canvas' | 'ai' | null;
+}
+
 export const training = {
   modules(courseId?: number): Promise<{ courses?: TrainingCourseInfo[]; modules?: TrainingModuleInfo[] }> {
     const qs = courseId ? `?course_id=${courseId}` : '';
@@ -608,6 +617,9 @@ export const training = {
   },
   progress(courseId: number): Promise<TrainingProgressResponse> {
     return apiFetch(`/training/progress/${courseId}`);
+  },
+  learningOutcomes(courseId: number, moduleName: string): Promise<LearningOutcomesResponse> {
+    return apiFetch(`/training/learning-outcomes/${courseId}/${encodeURIComponent(moduleName)}`);
   },
 };
 

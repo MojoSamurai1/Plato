@@ -159,6 +159,19 @@ class Plato_Database {
             KEY                  user_due (user_id, due_at)
         ) $charset_collate;
 
+        CREATE TABLE {$wpdb->prefix}plato_learning_outcomes (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            course_id       BIGINT UNSIGNED NOT NULL,
+            module_name     VARCHAR(255)    NOT NULL DEFAULT '',
+            outcomes        LONGTEXT        NOT NULL,
+            source          VARCHAR(20)     NOT NULL DEFAULT 'ai',
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            UNIQUE KEY      user_course_module (user_id, course_id, module_name(191))
+        ) $charset_collate;
+
         CREATE TABLE {$wpdb->prefix}plato_training_scenarios (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id         BIGINT UNSIGNED NOT NULL,
@@ -967,14 +980,16 @@ class Plato_Database {
 
         $all_content = '';
         foreach ( $content_items as $item ) {
-            // Study notes are stored with file_name matching the content_key pattern.
+            // Study notes file_name is built via sanitize_file_name("canvas-{module}-{title}").
+            // Reconstruct that pattern to match correctly.
+            $expected_file_name = sanitize_file_name( "canvas-{$module_name}-{$item->title}" );
             $chunks = $wpdb->get_results( $wpdb->prepare(
                 "SELECT content FROM $notes_table
-                 WHERE user_id = %d AND course_id = %d AND file_name LIKE %s AND status = 'completed'
+                 WHERE user_id = %d AND course_id = %d AND file_name = %s AND status = 'completed'
                  ORDER BY chunk_index ASC",
                 $user_id,
                 $course_id,
-                '%' . $wpdb->esc_like( $item->title ) . '%'
+                $expected_file_name
             ) );
 
             foreach ( $chunks as $chunk ) {
@@ -1184,5 +1199,46 @@ class Plato_Database {
             'activity_timeline' => $timeline,
             'generated_at'      => gmdate( 'c' ),
         );
+    }
+
+    // ─── Learning Outcomes CRUD ─────────────────────────────────────────────
+
+    public static function get_learning_outcomes( int $user_id, int $course_id, string $module_name ): object|null {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_learning_outcomes';
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND course_id = %d AND module_name = %s",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
+    }
+
+    public static function upsert_learning_outcomes( int $user_id, int $course_id, string $module_name, array $outcomes, string $source = 'ai' ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_learning_outcomes';
+
+        $existing = self::get_learning_outcomes( $user_id, $course_id, $module_name );
+
+        if ( $existing ) {
+            return $wpdb->update(
+                $table,
+                array(
+                    'outcomes'   => wp_json_encode( $outcomes ),
+                    'source'     => $source,
+                    'updated_at' => current_time( 'mysql', true ),
+                ),
+                array( 'id' => $existing->id )
+            ) !== false;
+        }
+
+        return $wpdb->insert( $table, array(
+            'user_id'     => $user_id,
+            'course_id'   => $course_id,
+            'module_name' => $module_name,
+            'outcomes'    => wp_json_encode( $outcomes ),
+            'source'      => $source,
+        ) ) !== false;
     }
 }
