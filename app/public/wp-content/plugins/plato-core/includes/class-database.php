@@ -42,6 +42,7 @@ class Plato_Database {
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id         BIGINT UNSIGNED NOT NULL,
             course_id       BIGINT UNSIGNED          DEFAULT NULL,
+            module_name     VARCHAR(255)             DEFAULT NULL,
             title           VARCHAR(255)    NOT NULL DEFAULT '',
             mode            VARCHAR(20)     NOT NULL DEFAULT 'socratic',
             created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -350,20 +351,41 @@ class Plato_Database {
 
     // ─── Conversations CRUD ──────────────────────────────────────────────────
 
-    public static function create_conversation( int $user_id, string $title, ?int $course_id = null, string $mode = 'socratic' ): int|false {
+    public static function create_conversation( int $user_id, string $title, ?int $course_id = null, string $mode = 'socratic', ?string $module_name = null ): int|false {
         global $wpdb;
+
+        $data = array(
+            'user_id'   => $user_id,
+            'course_id' => $course_id,
+            'title'     => $title,
+            'mode'      => $mode,
+        );
+
+        if ( $module_name !== null ) {
+            $data['module_name'] = $module_name;
+        }
 
         $result = $wpdb->insert(
             $wpdb->prefix . 'plato_conversations',
-            array(
-                'user_id'   => $user_id,
-                'course_id' => $course_id,
-                'title'     => $title,
-                'mode'      => $mode,
-            )
+            $data
         );
 
         return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    /**
+     * Find an existing training conversation for a user/course/module, or return null.
+     */
+    public static function get_training_conversation( int $user_id, int $course_id, string $module_name ): ?object {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_conversations';
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE user_id = %d AND course_id = %d AND module_name = %s AND mode = 'training' LIMIT 1",
+            $user_id,
+            $course_id,
+            $module_name
+        ) );
     }
 
     public static function get_conversations_for_user( int $user_id, int $limit = 20 ): array {
@@ -375,7 +397,7 @@ class Plato_Database {
             "SELECT cv.*, c.name AS course_name, c.course_code
              FROM $table cv
              LEFT JOIN $courses_table c ON c.id = cv.course_id
-             WHERE cv.user_id = %d
+             WHERE cv.user_id = %d AND cv.mode != 'training'
              ORDER BY cv.updated_at DESC
              LIMIT %d",
             $user_id,
@@ -981,7 +1003,6 @@ class Plato_Database {
         $all_content = '';
         foreach ( $content_items as $item ) {
             // Study notes file_name is built via sanitize_file_name("canvas-{module}-{title}").
-            // Reconstruct that pattern to match correctly.
             $expected_file_name = sanitize_file_name( "canvas-{$module_name}-{$item->title}" );
             $chunks = $wpdb->get_results( $wpdb->prepare(
                 "SELECT content FROM $notes_table

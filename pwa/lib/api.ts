@@ -330,7 +330,8 @@ export interface Conversation {
   user_id: number;
   course_id: number | null;
   title: string;
-  mode: 'socratic' | 'eli5';
+  module_name?: string | null;
+  mode: 'socratic' | 'eli5' | 'training';
   course_name?: string;
   course_code?: string;
   created_at: string;
@@ -620,6 +621,9 @@ export const training = {
   },
   learningOutcomes(courseId: number, moduleName: string): Promise<LearningOutcomesResponse> {
     return apiFetch(`/training/learning-outcomes/${courseId}/${encodeURIComponent(moduleName)}`);
+  },
+  conversation(courseId: number, moduleName: string): Promise<{ conversation: Conversation; messages: Message[] }> {
+    return apiFetch(`/training/conversation/${courseId}/${encodeURIComponent(moduleName)}`, { method: 'POST' });
   },
 };
 

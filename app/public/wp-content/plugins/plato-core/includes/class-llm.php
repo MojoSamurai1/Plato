@@ -69,6 +69,13 @@ class Plato_LLM {
         if ( $mode === 'eli5' ) {
             $base .= "\n\nELI5 MODE ACTIVE: Explain everything as simply as possible. Use everyday analogies, avoid jargon. "
                     . "Imagine you're explaining to a curious 10-year-old. Use short sentences and concrete examples.";
+        } elseif ( $mode === 'training' ) {
+            $base .= "\n\nTRAINING DISCUSSION MODE: You are helping the student learn and understand this specific module's content. "
+                    . "Use a Socratic approach — ask questions, encourage exploration, and guide understanding. "
+                    . "When they ask about a concept, explain it clearly and then check their understanding with a follow-up question. "
+                    . "Refer to the module content provided below to give accurate, specific answers. "
+                    . "Keep the conversation focused on this module's topics. "
+                    . "Be encouraging and patient — this is a learning conversation, not a test.";
         } else {
             $base .= "\n\nSOCRATIC MODE: Guide the student to understanding through questions. "
                     . "Don't just give answers — ask probing questions that help them think through the problem. "

@@ -184,6 +184,12 @@ class Plato_API {
             'permission_callback' => '__return_true',
         ) );
 
+        register_rest_route( self::NAMESPACE, '/training/conversation/(?P<course_id>\d+)/(?P<module_name>[^/]+)', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'training_conversation_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
         // ─── Settings ──────────────────────────────────────────────────────
         register_rest_route( self::NAMESPACE, '/settings/llm', array(
             'methods'             => 'GET',
@@ -872,8 +878,13 @@ class Plato_API {
         $provider = Plato_LLM::get_provider();
         $model    = Plato_LLM::get_model();
 
-        // Fetch study notes context for course.
-        $study_notes_context = $this->get_study_notes_context( $user_id, $conversation->course_id );
+        // Fetch context — module content for training mode, study notes otherwise.
+        if ( $conversation->mode === 'training' && $conversation->module_name && $conversation->course_id ) {
+            $module_content      = Plato_Database::get_module_content_for_training( $user_id, (int) $conversation->course_id, $conversation->module_name );
+            $study_notes_context = ! empty( $module_content ) ? $module_content : null;
+        } else {
+            $study_notes_context = $this->get_study_notes_context( $user_id, $conversation->course_id );
+        }
         $system   = Plato_LLM::build_system_prompt( $conversation->mode, $course, $study_notes_context );
 
         // Disable output buffering, set SSE headers.
@@ -1210,6 +1221,13 @@ class Plato_API {
         // Try to extract JSON from the response (handle markdown code blocks).
         if ( preg_match( '/```(?:json)?\s*([\s\S]*?)```/', $response_text, $matches ) ) {
             $response_text = trim( $matches[1] );
+        }
+
+        // Also try to find a raw JSON object if no code block matched.
+        if ( substr( trim( $response_text ), 0, 1 ) !== '{' ) {
+            if ( preg_match( '/(\{[\s\S]*\})/', $response_text, $json_match ) ) {
+                $response_text = trim( $json_match[1] );
+            }
         }
 
         $parsed = json_decode( $response_text, true );
@@ -1767,6 +1785,45 @@ class Plato_API {
             'success'  => true,
             'provider' => $provider,
             'model'    => Plato_LLM::get_model(),
+        ), 200 );
+    }
+
+    // ─── Training Conversation ──────────────────────────────────────────────
+
+    /**
+     * GET-or-CREATE a training conversation for a module, and return it with messages.
+     */
+    public function training_conversation_handler( WP_REST_Request $request ) {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id   = absint( $request->get_param( 'course_id' ) );
+        $module_name = urldecode( $request->get_param( 'module_name' ) );
+
+        if ( ! $course_id || empty( $module_name ) ) {
+            return new WP_Error( 'plato_missing_params', 'course_id and module_name are required.', array( 'status' => 400 ) );
+        }
+
+        // Try to find existing training conversation.
+        $conversation = Plato_Database::get_training_conversation( $user_id, $course_id, $module_name );
+
+        if ( ! $conversation ) {
+            // Create new training conversation.
+            $title   = 'Training: ' . $module_name;
+            $conv_id = Plato_Database::create_conversation( $user_id, $title, $course_id, 'training', $module_name );
+            if ( ! $conv_id ) {
+                return new WP_Error( 'plato_create_failed', 'Failed to create training conversation.', array( 'status' => 500 ) );
+            }
+            $conversation = Plato_Database::get_conversation( $conv_id, $user_id );
+        }
+
+        $messages = Plato_Database::get_messages( (int) $conversation->id );
+
+        return new WP_REST_Response( array(
+            'conversation' => $conversation,
+            'messages'     => $messages,
         ), 200 );
     }
 

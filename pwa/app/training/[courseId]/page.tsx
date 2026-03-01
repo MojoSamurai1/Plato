@@ -13,7 +13,6 @@ function ModuleListContent() {
   const courseId = Number(params.courseId);
   const [modules, setModules] = useState<TrainingModuleInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generatingModule, setGeneratingModule] = useState<string | null>(null);
 
   useEffect(() => {
     training
@@ -23,17 +22,9 @@ function ModuleListContent() {
       .finally(() => setLoading(false));
   }, [courseId]);
 
-  async function handleGenerate(moduleName: string) {
-    setGeneratingModule(moduleName);
-    try {
-      await training.generate(courseId, moduleName);
-      const res = await training.modules(courseId);
-      setModules(res.modules ?? []);
-    } catch {
-      // handled
-    } finally {
-      setGeneratingModule(null);
-    }
+  function handleNavigate(moduleName: string, generate: boolean) {
+    const base = `/training/${courseId}/${encodeURIComponent(moduleName)}`;
+    router.push(generate ? `${base}?generate=true` : base);
   }
 
   if (loading) {
@@ -63,7 +54,7 @@ function ModuleListContent() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Modules</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Generate scenarios for each module, then practice until you master them all.
+            Discuss module content with Plato, then test yourself with assessments to master each module.
           </p>
         </div>
 
@@ -78,11 +69,9 @@ function ModuleListContent() {
             <ModuleCard
               key={mod.module_name}
               module={mod}
-              generating={generatingModule === mod.module_name}
-              onGenerate={() => handleGenerate(mod.module_name)}
-              onClick={() =>
-                router.push(`/training/${courseId}/${encodeURIComponent(mod.module_name)}`)
-              }
+              generating={false}
+              onGenerate={() => handleNavigate(mod.module_name, true)}
+              onClick={() => handleNavigate(mod.module_name, false)}
             />
           ))}
         </div>

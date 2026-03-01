@@ -116,7 +116,7 @@ function QuizContent() {
               href={backUrl}
               className="text-sm text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition"
             >
-              &larr; Scenarios
+              &larr; Assessments
             </Link>
             <span className="text-xs text-gray-400">{scenario.total_points} points total</span>
           </div>
