@@ -75,6 +75,19 @@ Allowed origins are configured in the plugin entry file. Adding a new origin req
 - **Tailwind CSS** with custom color tokens (to be defined in `pwa/tailwind.config.js`)
 - Design system will be established during the first feature build
 
+## Bash Command & Tool Precedence (MANDATORY)
+
+**Agents MUST follow the global Bash Command Safety Policy:**
+`~/.claude/agents/bash-command-policy.md` (read-only commands auto-run, destructive commands require approval)
+
+**Tool Precedence (CRITICAL):**
+1. **Read** tool for file content (NOT `cat`, `head`, `tail`)
+2. **Grep** tool for searching (NOT `grep`, `rg`)
+3. **Glob** tool for file patterns (NOT `find`, `ls`)
+4. **Bash** ONLY for system commands, builds, tests, and git operations
+
+Violating tool precedence creates unnecessary approval prompts and reduces UX. Auto-run safe bash commands, but prefer dedicated tools for content operations.
+
 ## Deployment
 
 ### Hosting
