@@ -202,6 +202,129 @@ class Plato_API {
             'callback'            => array( $this, 'save_llm_settings_handler' ),
             'permission_callback' => '__return_true',
         ) );
+
+        // ─── Diagnostics ─────────────────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/diagnostics/questions', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_diagnostics_questions_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/diagnostics/submit', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'submit_diagnostics_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/diagnostics/profile', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_diagnostics_profile_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/diagnostics/history', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_diagnostics_history_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        // ─── Assignment Coach ──────────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/coach/briefs', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_coach_briefs_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/coach/briefs', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'create_coach_brief_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/coach/briefs/(?P<id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_coach_brief_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/coach/briefs/(?P<id>\d+)', array(
+            'methods'             => 'DELETE',
+            'callback'            => array( $this, 'delete_coach_brief_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/coach/start', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'start_coach_session_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        // ─── SCORM ──────────────────────────────────────────────────────────
+        register_rest_route( self::NAMESPACE, '/scorm/conversation', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'scorm_conversation_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/scenarios/generate', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'generate_scorm_scenario_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/scenarios/(?P<package_id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_scenarios_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/scenarios/(?P<id>\d+)/submit', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'submit_scorm_scenario_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/review-schedule', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_review_schedule_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/packages', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_packages_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/packages/(?P<id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_package_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/packages', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'create_scorm_package_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/track', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'scorm_track_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/progress/(?P<package_id>\d+)', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_progress_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
+
+        register_rest_route( self::NAMESPACE, '/scorm/progress/(?P<package_id>\d+)/statements', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_scorm_statements_handler' ),
+            'permission_callback' => '__return_true',
+        ) );
     }
 
     // ─── Auth Handlers ───────────────────────────────────────────────────────
@@ -673,7 +796,7 @@ class Plato_API {
 
         $title     = sanitize_text_field( $request->get_param( 'title' ) ?: 'New conversation' );
         $course_id = $request->get_param( 'course_id' ) ? absint( $request->get_param( 'course_id' ) ) : null;
-        $mode      = in_array( $request->get_param( 'mode' ), array( 'socratic', 'eli5' ), true )
+        $mode      = in_array( $request->get_param( 'mode' ), array( 'socratic', 'eli5', 'assignment_coach' ), true )
                      ? $request->get_param( 'mode' ) : 'socratic';
 
         $conv_id = Plato_Database::create_conversation( $user_id, $title, $course_id, $mode );
@@ -885,7 +1008,26 @@ class Plato_API {
         } else {
             $study_notes_context = $this->get_study_notes_context( $user_id, $conversation->course_id );
         }
-        $system   = Plato_LLM::build_system_prompt( $conversation->mode, $course, $study_notes_context );
+        $scorm_context = $this->get_scorm_context( $user_id );
+        $learner_profile_context = Plato_Diagnostics::get_ai_context( $user_id );
+
+        // Coach brief context for assignment_coach mode.
+        $coach_brief_context = null;
+        if ( $conversation->mode === 'assignment_coach' && $conversation->module_name ) {
+            // module_name stores the brief ID for coach conversations.
+            $brief = Plato_Database::get_coach_brief( (int) $conversation->module_name, $user_id );
+            if ( $brief ) {
+                $coach_brief_context = "SUBJECT: {$brief->subject_code} — {$brief->assessment_name}\n"
+                    . "WORD LIMIT: " . ( $brief->word_limit ?: 'Not specified' ) . "\n"
+                    . "WEIGHTING: " . ( $brief->weighting ?: 'Not specified' ) . "\n\n"
+                    . "BRIEF:\n{$brief->brief_content}";
+                if ( $brief->rubric_content ) {
+                    $coach_brief_context .= "\n\nRUBRIC:\n{$brief->rubric_content}";
+                }
+            }
+        }
+
+        $system   = Plato_LLM::build_system_prompt( $conversation->mode, $course, $study_notes_context, $scorm_context ?: null, $learner_profile_context, $coach_brief_context );
 
         // Disable output buffering, set SSE headers.
         while ( ob_get_level() ) {
@@ -1837,6 +1979,585 @@ class Plato_API {
      * Build study notes context string for LLM injection.
      * Returns null if no notes exist or course_id is null.
      */
+    // ─── SCORM Handlers ─────────────────────────────────────────────────────
+
+    public function get_scorm_packages_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $course_id = $request->get_param( 'course_id' );
+        $packages  = Plato_Scorm::get_packages( $user_id, $course_id ? (int) $course_id : null );
+
+        // Enrich each package with progress summary
+        $enriched = array();
+        foreach ( $packages as $pkg ) {
+            $progress = Plato_Scorm::get_progress( $user_id, (int) $pkg->id );
+            $enriched[] = array(
+                'id'              => (int) $pkg->id,
+                'course_id'       => $pkg->course_id ? (int) $pkg->course_id : null,
+                'slug'            => $pkg->slug,
+                'title'           => $pkg->title,
+                'description'     => $pkg->description,
+                'launch_url'      => $pkg->launch_url,
+                'duration_mins'   => $pkg->duration_mins ? (int) $pkg->duration_mins : null,
+                'module_count'    => (int) $pkg->module_count,
+                'status'          => $pkg->status,
+                'completion_pct'  => $progress['completion_pct'],
+                'latest_score'    => $progress['latest_score'],
+                'time_spent'      => $progress['time_spent_formatted'],
+                'created_at'      => $pkg->created_at,
+            );
+        }
+
+        return new WP_REST_Response( array( 'packages' => $enriched ), 200 );
+    }
+
+    public function get_scorm_package_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $id      = absint( $request->get_param( 'id' ) );
+        $package = Plato_Scorm::get_package( $id );
+
+        if ( ! $package || (int) $package->user_id !== $user_id ) {
+            return new WP_Error( 'plato_not_found', 'SCORM package not found.', array( 'status' => 404 ) );
+        }
+
+        $progress = Plato_Scorm::get_progress( $user_id, $id );
+
+        return new WP_REST_Response( array(
+            'package'  => $package,
+            'progress' => $progress,
+        ), 200 );
+    }
+
+    public function create_scorm_package_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $title      = sanitize_text_field( $request->get_param( 'title' ) ?? '' );
+        $slug       = sanitize_title( $request->get_param( 'slug' ) ?? $title );
+        $launch_url = esc_url_raw( $request->get_param( 'launch_url' ) ?? '' );
+
+        if ( empty( $title ) || empty( $launch_url ) ) {
+            return new WP_Error( 'plato_missing_fields', 'Title and launch_url are required.', array( 'status' => 400 ) );
+        }
+
+        $data = array(
+            'user_id'       => $user_id,
+            'course_id'     => $request->get_param( 'course_id' ) ? absint( $request->get_param( 'course_id' ) ) : null,
+            'slug'          => $slug,
+            'title'         => $title,
+            'description'   => sanitize_textarea_field( $request->get_param( 'description' ) ?? '' ),
+            'launch_url'    => $launch_url,
+            'duration_mins' => $request->get_param( 'duration_mins' ) ? absint( $request->get_param( 'duration_mins' ) ) : null,
+            'module_count'  => $request->get_param( 'module_count' ) ? absint( $request->get_param( 'module_count' ) ) : 0,
+            'status'        => 'active',
+        );
+
+        $id = Plato_Scorm::insert_package( $data );
+        if ( ! $id ) {
+            return new WP_Error( 'plato_insert_failed', 'Failed to create SCORM package.', array( 'status' => 500 ) );
+        }
+
+        return new WP_REST_Response( array(
+            'success' => true,
+            'id'      => $id,
+        ), 201 );
+    }
+
+    public function scorm_track_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        $events     = $request->get_param( 'events' );
+
+        if ( ! $package_id ) {
+            return new WP_Error( 'plato_missing_package', 'package_id is required.', array( 'status' => 400 ) );
+        }
+
+        // Verify package belongs to user
+        $package = Plato_Scorm::get_package( $package_id );
+        if ( ! $package || (int) $package->user_id !== $user_id ) {
+            return new WP_Error( 'plato_not_found', 'SCORM package not found.', array( 'status' => 404 ) );
+        }
+
+        $inserted = 0;
+
+        // Support batch events
+        if ( is_array( $events ) ) {
+            foreach ( $events as $event ) {
+                $data = self::parse_tracking_event( $user_id, $package_id, $event );
+                if ( $data ) {
+                    Plato_Scorm::insert_tracking( $data );
+                    $inserted++;
+                }
+            }
+        }
+
+        // Also support a single event
+        $verb = $request->get_param( 'verb' );
+        if ( $verb ) {
+            $data = self::parse_tracking_event( $user_id, $package_id, array(
+                'verb'            => $verb,
+                'activity_id'     => $request->get_param( 'activity_id' ) ?? '',
+                'activity_name'   => $request->get_param( 'activity_name' ) ?? '',
+                'result_score'    => $request->get_param( 'result_score' ),
+                'result_success'  => $request->get_param( 'result_success' ),
+                'result_complete' => $request->get_param( 'result_complete' ),
+                'result_duration' => $request->get_param( 'result_duration' ),
+                'extensions'      => $request->get_param( 'extensions' ),
+                'raw_statement'   => $request->get_param( 'raw_statement' ),
+            ) );
+            if ( $data ) {
+                Plato_Scorm::insert_tracking( $data );
+                $inserted++;
+            }
+        }
+
+        return new WP_REST_Response( array(
+            'success'  => true,
+            'inserted' => $inserted,
+        ), 200 );
+    }
+
+    public function get_scorm_progress_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        $progress   = Plato_Scorm::get_progress( $user_id, $package_id );
+
+        return new WP_REST_Response( $progress, 200 );
+    }
+
+    public function get_scorm_statements_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        $limit      = $request->get_param( 'limit' ) ? absint( $request->get_param( 'limit' ) ) : 100;
+        $statements = Plato_Scorm::get_statements( $user_id, $package_id, $limit );
+
+        return new WP_REST_Response( array( 'statements' => $statements ), 200 );
+    }
+
+    // ─── Diagnostics Handlers ─────────────────────────────────────────────
+
+    public function get_diagnostics_questions_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $questions = Plato_Diagnostics::get_questions();
+        // Strip scoring info — only return what the frontend needs.
+        $client_questions = array();
+        foreach ( $questions as $q ) {
+            $client_questions[] = array(
+                'id'            => $q['id'],
+                'text'          => $q['text'],
+                'dimension'     => $q['dimension'],
+                'sub_dimension' => $q['sub_dimension'],
+            );
+        }
+
+        return new WP_REST_Response( array(
+            'questions' => $client_questions,
+            'version'   => Plato_Diagnostics::QUESTION_BANK_VERSION,
+            'dimensions' => Plato_Diagnostics::DIMENSIONS,
+        ), 200 );
+    }
+
+    public function submit_diagnostics_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $answers = $request->get_param( 'answers' );
+        $version = $request->get_param( 'version' );
+
+        if ( empty( $answers ) || ! is_array( $answers ) ) {
+            return new WP_Error( 'plato_invalid_answers', 'Answers are required.', array( 'status' => 400 ) );
+        }
+
+        // Score server-side.
+        $scored = Plato_Diagnostics::score( $answers );
+
+        // Save result.
+        $result_id = Plato_Diagnostics::save_result( $user_id, $scored, $answers );
+        if ( ! $result_id ) {
+            return new WP_Error( 'plato_save_failed', 'Failed to save diagnostics result.', array( 'status' => 500 ) );
+        }
+
+        // Return the new profile.
+        $profile = Plato_Diagnostics::get_latest_profile( $user_id );
+
+        return new WP_REST_Response( array(
+            'success' => true,
+            'profile' => Plato_Diagnostics::format_profile( $profile ),
+        ), 200 );
+    }
+
+    public function get_diagnostics_profile_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $profile = Plato_Diagnostics::get_latest_profile( $user_id );
+        if ( ! $profile ) {
+            return new WP_REST_Response( array( 'profile' => null ), 200 );
+        }
+
+        $signals = Plato_Diagnostics::get_learner_signals( $user_id );
+
+        return new WP_REST_Response( array(
+            'profile' => Plato_Diagnostics::format_profile( $profile ),
+            'signals' => $signals ? array(
+                'calibration_gap'    => $signals->calibration_gap !== null ? (float) $signals->calibration_gap : null,
+                'help_seeking_rate'  => $signals->help_seeking_rate !== null ? (float) $signals->help_seeking_rate : null,
+                'session_consistency' => $signals->session_consistency !== null ? (float) $signals->session_consistency : null,
+                'wheel_spin_count'   => (int) $signals->wheel_spin_count,
+                'total_interactions' => (int) $signals->total_interactions,
+            ) : null,
+        ), 200 );
+    }
+
+    public function get_diagnostics_history_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $history = Plato_Diagnostics::get_history( $user_id );
+        $formatted = array();
+        foreach ( $history as $profile ) {
+            $formatted[] = Plato_Diagnostics::format_profile( $profile );
+        }
+
+        return new WP_REST_Response( array( 'history' => $formatted ), 200 );
+    }
+
+    // ─── SCORM Conversation & Scenario Handlers ─────────────────────────
+
+    public function scorm_conversation_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        if ( ! $package_id ) {
+            return new WP_Error( 'plato_missing_package', 'package_id is required.', array( 'status' => 400 ) );
+        }
+
+        $package = Plato_Scorm::get_package( $package_id );
+        if ( ! $package || (int) $package->user_id !== $user_id ) {
+            return new WP_Error( 'plato_not_found', 'SCORM package not found.', array( 'status' => 404 ) );
+        }
+
+        // Check for existing SCORM conversation.
+        global $wpdb;
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}plato_conversations
+             WHERE user_id = %d AND module_name = %s AND mode = 'socratic'
+             ORDER BY updated_at DESC LIMIT 1",
+            $user_id,
+            'scorm:' . $package_id
+        ) );
+
+        if ( $existing ) {
+            $messages = Plato_Database::get_messages( (int) $existing->id );
+            return new WP_REST_Response( array(
+                'conversation' => $existing,
+                'messages'     => $messages,
+            ), 200 );
+        }
+
+        // Create new conversation linked to this SCORM package.
+        $conv_id = Plato_Database::create_conversation(
+            $user_id,
+            'Ask Plato: ' . $package->title,
+            $package->course_id ? (int) $package->course_id : null,
+            'socratic'
+        );
+
+        if ( ! $conv_id ) {
+            return new WP_Error( 'plato_create_failed', 'Failed to create conversation.', array( 'status' => 500 ) );
+        }
+
+        // Tag with SCORM package reference via module_name.
+        $wpdb->update(
+            $wpdb->prefix . 'plato_conversations',
+            array( 'module_name' => 'scorm:' . $package_id ),
+            array( 'id' => $conv_id )
+        );
+
+        $conversation = Plato_Database::get_conversation( $conv_id, $user_id );
+
+        return new WP_REST_Response( array(
+            'conversation' => $conversation,
+            'messages'     => array(),
+        ), 201 );
+    }
+
+    public function generate_scorm_scenario_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        $type       = sanitize_text_field( $request->get_param( 'type' ) ?? 'quiz' );
+
+        $allowed_types = array( 'pre_assessment', 'quiz', 'walkthrough', 'post_assessment', 'review' );
+        if ( ! in_array( $type, $allowed_types, true ) ) {
+            return new WP_Error( 'plato_invalid_type', 'Invalid scenario type.', array( 'status' => 400 ) );
+        }
+
+        $package = Plato_Scorm::get_package( $package_id );
+        if ( ! $package || (int) $package->user_id !== $user_id ) {
+            return new WP_Error( 'plato_not_found', 'SCORM package not found.', array( 'status' => 404 ) );
+        }
+
+        // Generate scenario via LLM.
+        $scenario = Plato_Scorm::generate_scenario( $package, $type, $user_id );
+        if ( is_wp_error( $scenario ) ) {
+            return $scenario;
+        }
+
+        return new WP_REST_Response( array(
+            'success'  => true,
+            'scenario' => $scenario,
+        ), 200 );
+    }
+
+    public function get_scorm_scenarios_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $package_id = absint( $request->get_param( 'package_id' ) );
+        $scenarios  = Plato_Scorm::get_scenarios( $user_id, $package_id );
+
+        return new WP_REST_Response( array( 'scenarios' => $scenarios ), 200 );
+    }
+
+    public function submit_scorm_scenario_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $scenario_id = absint( $request->get_param( 'id' ) );
+        $answers     = $request->get_param( 'answers' );
+
+        if ( empty( $answers ) || ! is_array( $answers ) ) {
+            return new WP_Error( 'plato_invalid_answers', 'Answers are required.', array( 'status' => 400 ) );
+        }
+
+        $result = Plato_Scorm::submit_scenario( $scenario_id, $user_id, $answers );
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        return new WP_REST_Response( $result, 200 );
+    }
+
+    public function get_scorm_review_schedule_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $reviews = Plato_Scorm::get_review_schedule( $user_id );
+
+        return new WP_REST_Response( array( 'reviews' => $reviews ), 200 );
+    }
+
+    /**
+     * Get SCORM context for AI prompts.
+     */
+    public function get_scorm_context( int $user_id ): string {
+        return Plato_Scorm::get_ai_context( $user_id );
+    }
+
+    private static function parse_tracking_event( int $user_id, int $package_id, array $event ): ?array {
+        $verb = sanitize_text_field( $event['verb'] ?? '' );
+        if ( empty( $verb ) ) {
+            return null;
+        }
+
+        return array(
+            'user_id'         => $user_id,
+            'package_id'      => $package_id,
+            'verb'            => $verb,
+            'activity_id'     => sanitize_text_field( $event['activity_id'] ?? '' ),
+            'activity_name'   => sanitize_text_field( $event['activity_name'] ?? '' ),
+            'result_score'    => isset( $event['result_score'] ) ? floatval( $event['result_score'] ) : null,
+            'result_success'  => isset( $event['result_success'] ) ? ( $event['result_success'] ? 1 : 0 ) : null,
+            'result_complete' => isset( $event['result_complete'] ) ? ( $event['result_complete'] ? 1 : 0 ) : null,
+            'result_duration' => isset( $event['result_duration'] ) ? sanitize_text_field( $event['result_duration'] ) : null,
+            'extensions'      => isset( $event['extensions'] ) ? wp_json_encode( $event['extensions'] ) : null,
+            'raw_statement'   => isset( $event['raw_statement'] ) ? wp_json_encode( $event['raw_statement'] ) : null,
+        );
+    }
+
+    // ─── Assignment Coach Handlers ──────────────────────────────────────────
+
+    public function get_coach_briefs_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $briefs = Plato_Database::get_coach_briefs_for_user( $user_id );
+
+        return new WP_REST_Response( array( 'briefs' => $briefs ), 200 );
+    }
+
+    public function create_coach_brief_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $title           = sanitize_text_field( $request->get_param( 'title' ) ?: '' );
+        $subject_code    = sanitize_text_field( $request->get_param( 'subject_code' ) ?: '' );
+        $assessment_name = sanitize_text_field( $request->get_param( 'assessment_name' ) ?: '' );
+        $brief_content   = $request->get_param( 'brief_content' ) ?: '';
+        $rubric_content  = $request->get_param( 'rubric_content' ) ?: '';
+        $word_limit      = $request->get_param( 'word_limit' ) ? absint( $request->get_param( 'word_limit' ) ) : null;
+        $weighting       = sanitize_text_field( $request->get_param( 'weighting' ) ?: '' );
+        $course_id       = $request->get_param( 'course_id' ) ? absint( $request->get_param( 'course_id' ) ) : null;
+
+        if ( empty( $brief_content ) ) {
+            return new WP_Error( 'plato_empty_brief', 'Brief content is required.', array( 'status' => 400 ) );
+        }
+
+        $brief_id = Plato_Database::insert_coach_brief( array(
+            'user_id'         => $user_id,
+            'course_id'       => $course_id,
+            'title'           => $title ?: ( $subject_code . ' ' . $assessment_name ),
+            'subject_code'    => $subject_code,
+            'assessment_name' => $assessment_name,
+            'brief_content'   => wp_kses_post( $brief_content ),
+            'rubric_content'  => wp_kses_post( $rubric_content ),
+            'word_limit'      => $word_limit,
+            'weighting'       => $weighting,
+        ) );
+
+        if ( ! $brief_id ) {
+            return new WP_Error( 'plato_create_failed', 'Failed to create brief.', array( 'status' => 500 ) );
+        }
+
+        $brief = Plato_Database::get_coach_brief( $brief_id, $user_id );
+
+        return new WP_REST_Response( array( 'brief' => $brief ), 201 );
+    }
+
+    public function get_coach_brief_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $brief_id = absint( $request->get_param( 'id' ) );
+        $brief    = Plato_Database::get_coach_brief( $brief_id, $user_id );
+
+        if ( ! $brief ) {
+            return new WP_Error( 'plato_not_found', 'Brief not found.', array( 'status' => 404 ) );
+        }
+
+        return new WP_REST_Response( array( 'brief' => $brief ), 200 );
+    }
+
+    public function delete_coach_brief_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $brief_id = absint( $request->get_param( 'id' ) );
+        $deleted  = Plato_Database::delete_coach_brief( $brief_id, $user_id );
+
+        if ( ! $deleted ) {
+            return new WP_Error( 'plato_not_found', 'Brief not found.', array( 'status' => 404 ) );
+        }
+
+        return new WP_REST_Response( array( 'deleted' => true ), 200 );
+    }
+
+    public function start_coach_session_handler( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+        $user_id = $this->authenticate( $request );
+        if ( is_wp_error( $user_id ) ) {
+            return $user_id;
+        }
+
+        $brief_id  = absint( $request->get_param( 'brief_id' ) );
+        $course_id = $request->get_param( 'course_id' ) ? absint( $request->get_param( 'course_id' ) ) : null;
+
+        if ( ! $brief_id ) {
+            return new WP_Error( 'plato_missing_brief', 'brief_id is required.', array( 'status' => 400 ) );
+        }
+
+        // Verify brief exists and belongs to user.
+        $brief = Plato_Database::get_coach_brief( $brief_id, $user_id );
+        if ( ! $brief ) {
+            return new WP_Error( 'plato_not_found', 'Brief not found.', array( 'status' => 404 ) );
+        }
+
+        // Check for existing coach conversation for this brief.
+        global $wpdb;
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}plato_conversations
+             WHERE user_id = %d AND module_name = %s AND mode = 'assignment_coach' LIMIT 1",
+            $user_id,
+            (string) $brief_id
+        ) );
+
+        if ( $existing ) {
+            $messages = Plato_Database::get_messages( (int) $existing->id );
+            return new WP_REST_Response( array(
+                'conversation' => $existing,
+                'messages'     => $messages,
+                'brief'        => $brief,
+            ), 200 );
+        }
+
+        // Create new coaching conversation. Store brief_id in module_name field.
+        $title   = "Coach: {$brief->subject_code} {$brief->assessment_name}";
+        $conv_id = Plato_Database::create_conversation( $user_id, $title, $course_id ?: ( $brief->course_id ? (int) $brief->course_id : null ), 'assignment_coach', (string) $brief_id );
+
+        if ( ! $conv_id ) {
+            return new WP_Error( 'plato_create_failed', 'Failed to create coaching session.', array( 'status' => 500 ) );
+        }
+
+        $conversation = Plato_Database::get_conversation( $conv_id, $user_id );
+
+        return new WP_REST_Response( array(
+            'conversation' => $conversation,
+            'messages'     => array(),
+            'brief'        => $brief,
+        ), 201 );
+    }
+
     private function get_study_notes_context( int $user_id, $course_id ): ?string {
         if ( ! $course_id ) {
             return null;

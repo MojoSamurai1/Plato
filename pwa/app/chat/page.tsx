@@ -45,6 +45,10 @@ function ChatContent() {
         setConversations(convRes.conversations);
         setCourseList(coursesRes.courses);
         setLlmConfigured(llmRes.configured);
+        // Auto-select if there's only one course.
+        if (coursesRes.courses.length === 1) {
+          setSelectedCourse(coursesRes.courses[0].id);
+        }
       } catch {
         // handled by api.ts
       } finally {
@@ -275,6 +279,12 @@ function ChatContent() {
             &larr; Dashboard
           </Link>
           <Link
+            href="/coach"
+            className="block text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition px-2"
+          >
+            Assignment Coach
+          </Link>
+          <Link
             href="/training"
             className="block text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition px-2"
           >
@@ -312,14 +322,22 @@ function ChatContent() {
             {activeConv?.title || 'New Chat'}
           </h1>
 
-          {/* Course selector */}
-          {!activeConv && (
+          {/* Course selector — always visible; disabled once conversation is active */}
+          {activeConv ? (
+            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[160px]">
+              {activeConv.course_code || 'No course'}
+            </span>
+          ) : (
             <select
               value={selectedCourse ?? ''}
               onChange={(e) => setSelectedCourse(e.target.value ? Number(e.target.value) : null)}
-              className="text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-300 outline-none"
+              className={`text-xs border rounded-lg px-2 py-1.5 outline-none ${
+                selectedCourse
+                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
+                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
+              }`}
             >
-              <option value="">All courses</option>
+              <option value="">Select a course...</option>
               {courseList.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.course_code}
@@ -366,6 +384,11 @@ function ChatContent() {
                   ? "I'll explain things as simply as possible — like you're five. No jargon, just clear explanations with everyday analogies."
                   : "I'll guide you to understanding through questions. I won't just give you the answer — I'll help you figure it out yourself."}
               </p>
+              {!selectedCourse && courseList.length > 0 && (
+                <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  Tip: Select a course above so I can use your study notes and course materials.
+                </p>
+              )}
             </div>
           )}
 

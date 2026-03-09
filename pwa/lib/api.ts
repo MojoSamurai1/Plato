@@ -627,6 +627,62 @@ export const training = {
   },
 };
 
+// ─── Assignment Coach ────────────────────────────────────────────────────────
+
+export interface CoachBrief {
+  id: number;
+  user_id: number;
+  course_id: number | null;
+  title: string;
+  subject_code: string;
+  assessment_name: string;
+  brief_content?: string;
+  rubric_content?: string;
+  word_limit: number | null;
+  weighting: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface CoachSessionResponse {
+  conversation: Conversation;
+  messages: Message[];
+  brief: CoachBrief;
+}
+
+export const coach = {
+  listBriefs(): Promise<{ briefs: CoachBrief[] }> {
+    return apiFetch('/coach/briefs');
+  },
+  createBrief(data: {
+    title?: string;
+    subject_code: string;
+    assessment_name: string;
+    brief_content: string;
+    rubric_content?: string;
+    word_limit?: number;
+    weighting?: string;
+    course_id?: number;
+  }): Promise<{ brief: CoachBrief }> {
+    return apiFetch('/coach/briefs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  getBrief(id: number): Promise<{ brief: CoachBrief }> {
+    return apiFetch(`/coach/briefs/${id}`);
+  },
+  deleteBrief(id: number): Promise<{ deleted: boolean }> {
+    return apiFetch(`/coach/briefs/${id}`, { method: 'DELETE' });
+  },
+  startSession(briefId: number, courseId?: number): Promise<CoachSessionResponse> {
+    return apiFetch('/coach/start', {
+      method: 'POST',
+      body: JSON.stringify({ brief_id: briefId, course_id: courseId }),
+    });
+  },
+};
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export interface DashboardOverview {
@@ -714,5 +770,252 @@ export const settings = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+};
+
+// ─── Diagnostics ────────────────────────────────────────────────────────────
+
+export interface DiagnosticsQuestion {
+  id: string;
+  text: string;
+  dimension: string;
+  sub_dimension: string;
+}
+
+export interface DiagnosticsDimension {
+  label: string;
+  description: string;
+  sub_dimensions: string[];
+}
+
+export interface DiagnosticsProfile {
+  id: number;
+  version: number;
+  self_efficacy: number;
+  self_regulation: number;
+  learning_approach: number;
+  metacognitive: number;
+  confidence: number;
+  dimension_detail: Record<string, number>;
+  completed_at: string;
+  stale: boolean;
+  dimensions: Record<string, DiagnosticsDimension>;
+}
+
+export interface LearnerSignals {
+  calibration_gap: number | null;
+  help_seeking_rate: number | null;
+  session_consistency: number | null;
+  wheel_spin_count: number;
+  total_interactions: number;
+}
+
+export const diagnostics = {
+  questions(): Promise<{
+    questions: DiagnosticsQuestion[];
+    version: number;
+    dimensions: Record<string, DiagnosticsDimension>;
+  }> {
+    return apiFetch('/diagnostics/questions');
+  },
+  submit(answers: Record<string, number>, version: number): Promise<{
+    success: boolean;
+    profile: DiagnosticsProfile;
+  }> {
+    return apiFetch('/diagnostics/submit', {
+      method: 'POST',
+      body: JSON.stringify({ answers, version }),
+    });
+  },
+  profile(): Promise<{
+    profile: DiagnosticsProfile | null;
+    signals: LearnerSignals | null;
+  }> {
+    return apiFetch('/diagnostics/profile');
+  },
+  history(): Promise<{ history: DiagnosticsProfile[] }> {
+    return apiFetch('/diagnostics/history');
+  },
+};
+
+// ─── SCORM ──────────────────────────────────────────────────────────────────
+
+export interface ScormPackage {
+  id: number;
+  course_id: number | null;
+  slug: string;
+  title: string;
+  description: string | null;
+  launch_url: string;
+  duration_mins: number | null;
+  module_count: number;
+  status: string;
+  completion_pct: number;
+  latest_score: number | null;
+  time_spent: string;
+  created_at: string;
+}
+
+export interface ScormActivity {
+  activity_id: string;
+  activity_name: string;
+  best_score: number | null;
+  completed: boolean;
+  passed: boolean;
+  attempts: number;
+  last_attempt: string;
+}
+
+export interface ScormVerb {
+  verb: string;
+  count: number;
+}
+
+export interface ScormProgressData {
+  total_statements: number;
+  completion_pct: number;
+  completed_activities: number;
+  total_activities: number;
+  latest_score: number | null;
+  time_spent_seconds: number;
+  time_spent_formatted: string;
+  activities: ScormActivity[];
+  verbs: ScormVerb[];
+}
+
+export interface ScormStatement {
+  id: number;
+  user_id: number;
+  package_id: number;
+  verb: string;
+  activity_id: string;
+  activity_name: string;
+  result_score: number | null;
+  result_success: boolean | null;
+  result_complete: boolean | null;
+  result_duration: string | null;
+  extensions: string | null;
+  raw_statement: string | null;
+  created_at: string;
+}
+
+export interface ScormEvent {
+  verb: string;
+  activity_id?: string;
+  activity_name?: string;
+  result_score?: number;
+  result_success?: boolean;
+  result_complete?: boolean;
+  result_duration?: string;
+  extensions?: Record<string, unknown>;
+  raw_statement?: Record<string, unknown>;
+}
+
+export interface ScormScenarioQuestion {
+  type: 'mcq' | 'short_answer' | 'true_false' | 'matching' | 'ordering' | 'scenario_judgment';
+  question: string;
+  options?: string[];
+  correct?: number | boolean;
+  sample_answer?: string;
+  explanation?: string;
+  // matching: pairs of [term, definition]
+  pairs?: [string, string][];
+  // ordering: items in correct order
+  items?: string[];
+  // scenario_judgment: scenario context before question
+  scenario_context?: string;
+}
+
+export interface ScormScenario {
+  id: number;
+  package_id: number;
+  type: 'pre_assessment' | 'quiz' | 'walkthrough' | 'post_assessment' | 'review' | 'myth_buster' | 'real_world' | 'concept_match';
+  title: string;
+  questions: ScormScenarioQuestion[];
+  status: 'pending' | 'completed';
+  score: number | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ScormReview {
+  package_id: number;
+  package_title: string;
+  review_type: string;
+  due_date: string;
+  days_overdue: number;
+}
+
+export const scorm = {
+  packages(courseId?: number): Promise<{ packages: ScormPackage[] }> {
+    const qs = courseId ? `?course_id=${courseId}` : '';
+    return apiFetch(`/scorm/packages${qs}`);
+  },
+  packageDetail(id: number): Promise<{ package: ScormPackage; progress: ScormProgressData }> {
+    return apiFetch(`/scorm/packages/${id}`);
+  },
+  create(data: {
+    title: string;
+    slug?: string;
+    launch_url: string;
+    course_id?: number;
+    description?: string;
+    duration_mins?: number;
+    module_count?: number;
+  }): Promise<{ success: boolean; id: number }> {
+    return apiFetch('/scorm/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  track(packageId: number, events: ScormEvent[]): Promise<{ success: boolean; inserted: number }> {
+    return apiFetch('/scorm/track', {
+      method: 'POST',
+      body: JSON.stringify({ package_id: packageId, events }),
+    });
+  },
+  progress(packageId: number): Promise<ScormProgressData> {
+    return apiFetch(`/scorm/progress/${packageId}`);
+  },
+  statements(packageId: number, limit?: number): Promise<{ statements: ScormStatement[] }> {
+    const qs = limit ? `?limit=${limit}` : '';
+    return apiFetch(`/scorm/progress/${packageId}/statements${qs}`);
+  },
+  conversation(packageId: number): Promise<{ conversation: Conversation; messages: Message[] }> {
+    return apiFetch('/scorm/conversation', {
+      method: 'POST',
+      body: JSON.stringify({ package_id: packageId }),
+    });
+  },
+  generateScenario(packageId: number, type: string): Promise<{ success: boolean; scenario: ScormScenario }> {
+    return apiFetch('/scorm/scenarios/generate', {
+      method: 'POST',
+      body: JSON.stringify({ package_id: packageId, type }),
+    });
+  },
+  scenarios(packageId: number): Promise<{ scenarios: ScormScenario[] }> {
+    return apiFetch(`/scorm/scenarios/${packageId}`);
+  },
+  submitScenario(scenarioId: number, answers: (number | string | null)[]): Promise<{
+    scenario_id: number;
+    score: number;
+    total: number;
+    feedback: Array<{
+      question_index: number;
+      type: string;
+      correct?: boolean;
+      correct_option?: number;
+      chosen?: number;
+      score?: number;
+      explanation: string;
+    }>;
+  }> {
+    return apiFetch(`/scorm/scenarios/${scenarioId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
+  },
+  reviewSchedule(): Promise<{ reviews: ScormReview[] }> {
+    return apiFetch('/scorm/review-schedule');
   },
 };

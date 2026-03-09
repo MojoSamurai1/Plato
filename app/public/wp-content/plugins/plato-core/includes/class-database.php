@@ -203,6 +203,110 @@ class Plato_Database {
             created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY         (id),
             KEY                 user_scenario (user_id, scenario_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_scorm_packages (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            course_id       BIGINT UNSIGNED          DEFAULT NULL,
+            slug            VARCHAR(100)    NOT NULL DEFAULT '',
+            title           VARCHAR(255)    NOT NULL DEFAULT '',
+            description     TEXT                     DEFAULT NULL,
+            launch_url      VARCHAR(500)    NOT NULL DEFAULT '',
+            duration_mins   INT UNSIGNED             DEFAULT NULL,
+            module_count    INT UNSIGNED    NOT NULL DEFAULT 0,
+            status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            UNIQUE KEY      slug (slug),
+            KEY             user_id (user_id),
+            KEY             course_id (course_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_scorm_tracking (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            package_id      BIGINT UNSIGNED NOT NULL,
+            verb            VARCHAR(100)    NOT NULL DEFAULT '',
+            activity_id     VARCHAR(500)    NOT NULL DEFAULT '',
+            activity_name   VARCHAR(255)    NOT NULL DEFAULT '',
+            result_score    DECIMAL(5,2)             DEFAULT NULL,
+            result_success  TINYINT(1)               DEFAULT NULL,
+            result_complete TINYINT(1)               DEFAULT NULL,
+            result_duration VARCHAR(50)              DEFAULT NULL,
+            extensions      LONGTEXT                 DEFAULT NULL,
+            raw_statement   LONGTEXT                 DEFAULT NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            KEY             user_package (user_id, package_id),
+            KEY             verb (verb),
+            KEY             activity_id (activity_id(191))
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_diagnostics_results (
+            id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id                 BIGINT UNSIGNED NOT NULL,
+            version                 INT UNSIGNED    NOT NULL DEFAULT 1,
+            self_efficacy_score     DECIMAL(4,2)    NOT NULL DEFAULT 0.00,
+            self_regulation_score   DECIMAL(4,2)    NOT NULL DEFAULT 0.00,
+            learning_approach_score DECIMAL(4,2)    NOT NULL DEFAULT 0.00,
+            metacognitive_score     DECIMAL(4,2)    NOT NULL DEFAULT 0.00,
+            confidence_score        DECIMAL(4,2)    NOT NULL DEFAULT 0.00,
+            raw_answers             LONGTEXT                 DEFAULT NULL,
+            dimension_detail        LONGTEXT                 DEFAULT NULL,
+            completed_at            DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY             (id),
+            KEY                     user_id (user_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_learner_signals (
+            id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id                 BIGINT UNSIGNED NOT NULL,
+            avg_response_latency_ms INT UNSIGNED             DEFAULT NULL,
+            calibration_gap         DECIMAL(4,2)             DEFAULT NULL,
+            help_seeking_rate       DECIMAL(4,2)             DEFAULT NULL,
+            wheel_spin_count        INT UNSIGNED    NOT NULL DEFAULT 0,
+            session_consistency     DECIMAL(4,2)             DEFAULT NULL,
+            deep_surface_ratio      DECIMAL(4,2)             DEFAULT NULL,
+            total_interactions      INT UNSIGNED    NOT NULL DEFAULT 0,
+            updated_at              DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY             (id),
+            UNIQUE KEY              user_id (user_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_coach_briefs (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            course_id       BIGINT UNSIGNED          DEFAULT NULL,
+            title           VARCHAR(255)    NOT NULL DEFAULT '',
+            subject_code    VARCHAR(100)    NOT NULL DEFAULT '',
+            assessment_name VARCHAR(255)    NOT NULL DEFAULT '',
+            brief_content   LONGTEXT        NOT NULL,
+            rubric_content  LONGTEXT                 DEFAULT NULL,
+            word_limit      INT UNSIGNED             DEFAULT NULL,
+            weighting       VARCHAR(20)              DEFAULT NULL,
+            status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY     (id),
+            KEY             user_id (user_id),
+            KEY             course_id (course_id)
+        ) $charset_collate;
+
+        CREATE TABLE {$wpdb->prefix}plato_scorm_scenarios (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            package_id      BIGINT UNSIGNED NOT NULL,
+            type            VARCHAR(30)     NOT NULL DEFAULT 'quiz',
+            content         LONGTEXT                 DEFAULT NULL,
+            status          VARCHAR(20)     NOT NULL DEFAULT 'pending',
+            score           DECIMAL(5,2)             DEFAULT NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at    DATETIME                 DEFAULT NULL,
+            PRIMARY KEY     (id),
+            KEY             user_package (user_id, package_id),
+            KEY             type (type)
         ) $charset_collate;";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -397,7 +501,7 @@ class Plato_Database {
             "SELECT cv.*, c.name AS course_name, c.course_code
              FROM $table cv
              LEFT JOIN $courses_table c ON c.id = cv.course_id
-             WHERE cv.user_id = %d AND cv.mode != 'training'
+             WHERE cv.user_id = %d AND cv.mode NOT IN ('training', 'assignment_coach')
              ORDER BY cv.updated_at DESC
              LIMIT %d",
             $user_id,
@@ -492,6 +596,45 @@ class Plato_Database {
             $user_id,
             gmdate( 'Y-m-d H:i:s', time() - 3600 )
         ) );
+    }
+
+    // ─── Coach Briefs CRUD ─────────────────────────────────────────────────
+
+    public static function insert_coach_brief( array $data ): int|false {
+        global $wpdb;
+        $result = $wpdb->insert( $wpdb->prefix . 'plato_coach_briefs', $data );
+        return $result !== false ? (int) $wpdb->insert_id : false;
+    }
+
+    public static function get_coach_briefs_for_user( int $user_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_coach_briefs';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, user_id, course_id, title, subject_code, assessment_name, word_limit, weighting, status, created_at
+             FROM $table WHERE user_id = %d AND status = 'active' ORDER BY created_at DESC",
+            $user_id
+        ) );
+    }
+
+    public static function get_coach_brief( int $brief_id, int $user_id ): ?object {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_coach_briefs';
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $table WHERE id = %d AND user_id = %d",
+            $brief_id,
+            $user_id
+        ) );
+    }
+
+    public static function delete_coach_brief( int $brief_id, int $user_id ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'plato_coach_briefs';
+        $deleted = $wpdb->update(
+            $table,
+            array( 'status' => 'deleted' ),
+            array( 'id' => $brief_id, 'user_id' => $user_id )
+        );
+        return $deleted !== false;
     }
 
     // ─── Study Notes CRUD (P3: Document Ingestion) ──────────────────────────

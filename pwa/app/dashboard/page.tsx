@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CourseCard from '@/components/CourseCard';
 import AssignmentList from '@/components/AssignmentList';
-import { courses, assignments, canvas, type Course, type Assignment } from '@/lib/api';
+import { courses, assignments, canvas, diagnostics, scorm, type Course, type Assignment, type DiagnosticsProfile, type ScormReview } from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
@@ -23,13 +23,17 @@ function DashboardContent() {
   const [contentSyncMsg, setContentSyncMsg] = useState('');
   const [contentPages, setContentPages] = useState(0);
   const [contentLastSync, setContentLastSync] = useState<string | null>(null);
+  const [learningProfile, setLearningProfile] = useState<DiagnosticsProfile | null>(null);
+  const [reviews, setReviews] = useState<ScormReview[]>([]);
 
   async function loadData() {
     try {
-      const [coursesRes, assignmentsRes, statusRes] = await Promise.all([
+      const [coursesRes, assignmentsRes, statusRes, profileRes, reviewsRes] = await Promise.all([
         courses.list(),
         assignments.list({ upcoming: true, limit: 10 }),
         canvas.status(),
+        diagnostics.profile().catch(() => ({ profile: null })),
+        scorm.reviewSchedule().catch(() => ({ reviews: [] })),
       ]);
 
       setCourseList(coursesRes.courses);
@@ -37,6 +41,8 @@ function DashboardContent() {
       setSyncStatus(coursesRes.sync_status);
       setLastSync(coursesRes.last_sync);
       setConnected(statusRes.connected);
+      setLearningProfile(profileRes.profile);
+      setReviews(reviewsRes.reviews);
       if (statusRes.content_sync) {
         setContentPages(statusRes.content_sync.pages_synced);
         setContentLastSync(statusRes.content_sync.last_sync);
@@ -128,6 +134,12 @@ function DashboardContent() {
               Learning
             </Link>
             <Link
+              href="/coach"
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+            >
+              Coach
+            </Link>
+            <Link
               href="/training"
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
             >
@@ -212,6 +224,63 @@ function DashboardContent() {
                 {contentSyncMsg}
               </p>
             )}
+          </div>
+        )}
+
+        {/* Learning Profile Card */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Learning Profile
+              </h3>
+              {learningProfile ? (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Self-Efficacy: {learningProfile.self_efficacy.toFixed(1)} ·
+                  Metacognition: {learningProfile.metacognitive.toFixed(1)} ·
+                  Self-Regulation: {learningProfile.self_regulation.toFixed(1)}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Take a 5-min diagnostic to personalise Plato
+                </p>
+              )}
+            </div>
+            <Link
+              href={learningProfile ? '/diagnostics' : '/diagnostics/take'}
+              className={`text-sm px-3 py-1.5 rounded-lg transition font-medium ${
+                learningProfile
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              }`}
+            >
+              {learningProfile ? 'View Profile' : 'Start Diagnostic'}
+            </Link>
+          </div>
+        </div>
+
+        {/* SCORM Review Prompts */}
+        {reviews.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2">
+              Spaced Review Due
+            </h3>
+            <div className="space-y-2">
+              {reviews.map((r) => (
+                <div key={`${r.package_id}-${r.review_type}`} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">{r.package_title}</p>
+                    <p className="text-[10px] text-gray-400">{r.review_type} — {r.days_overdue > 0 ? `${r.days_overdue}d overdue` : 'due today'}</p>
+                  </div>
+                  <Link
+                    href="/scorm"
+                    className="text-xs font-medium text-amber-600 hover:text-amber-800 transition"
+                  >
+                    Review
+                  </Link>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

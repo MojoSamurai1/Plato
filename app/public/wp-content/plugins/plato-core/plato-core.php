@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PLATO_VERSION', '1.7.0' );
+define( 'PLATO_VERSION', '2.0.0' );
 define( 'PLATO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PLATO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -33,6 +33,8 @@ require_once PLATO_PLUGIN_DIR . 'includes/class-auth.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-canvas.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-llm.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-document-processor.php';
+require_once PLATO_PLUGIN_DIR . 'includes/class-scorm.php';
+require_once PLATO_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once PLATO_PLUGIN_DIR . 'includes/class-api.php';
 
 // ─── PHP Upload Limits ──────────────────────────────────────────────────────

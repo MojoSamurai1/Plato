@@ -7,14 +7,19 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import {
   courses,
   canvas,
+  scorm,
   type CourseContentResponse,
   type ModuleSummary,
   type Assignment,
   type CourseDiscussion,
   type ModuleProgress,
   type EmbeddedResource,
+  type ScormPackage,
+  type ScormEvent,
 } from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
+import ScormPlayer from '@/components/scorm/ScormPlayer';
+import ScormProgress from '@/components/scorm/ScormProgress';
 
 const CANVAS_BASE = 'https://mylearn.torrens.edu.au';
 
@@ -241,14 +246,19 @@ function CourseDetailContent() {
   const [expandedAssignment, setExpandedAssignment] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [scormPackages, setScormPackages] = useState<ScormPackage[]>([]);
+  const [activeScorm, setActiveScorm] = useState<ScormPackage | null>(null);
+  const [latestScormEvent, setLatestScormEvent] = useState<ScormEvent | null>(null);
 
   // Load course structure + all content in parallel
   useEffect(() => {
     const loadCourse = courses.content(courseId);
     const loadContent = courses.moduleSummaries(courseId);
+    const loadScorm = scorm.packages(courseId).catch(() => ({ packages: [] }));
 
-    Promise.all([loadCourse, loadContent])
-      .then(([courseData, summariesData]) => {
+    Promise.all([loadCourse, loadContent, loadScorm])
+      .then(([courseData, summariesData, scormData]) => {
+        setScormPackages(scormData.packages);
         setData(courseData);
         const allModules = new Set(courseData.modules.map((m) => m.module_name));
         setExpandedModules(allModules);
@@ -743,6 +753,60 @@ function CourseDetailContent() {
             </div>
           )}
         </section>
+
+        {/* SCORM Interactive Modules */}
+        {scormPackages.length > 0 && (
+          <section>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
+              Interactive Modules
+            </h3>
+
+            {activeScorm ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+                  <ScormPlayer
+                    packageId={activeScorm.id}
+                    launchUrl={activeScorm.launch_url}
+                    title={activeScorm.title}
+                    onEvent={(evt) => setLatestScormEvent({ ...evt })}
+                    onClose={() => {
+                      setActiveScorm(null);
+                      setLatestScormEvent(null);
+                      scorm.packages(courseId).then((res) => setScormPackages(res.packages)).catch(() => {});
+                    }}
+                  />
+                </div>
+                <div>
+                  <ScormProgress packageId={activeScorm.id} liveEvent={latestScormEvent} />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {scormPackages.map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 flex items-center justify-between hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer"
+                    onClick={() => setActiveScorm(pkg)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {pkg.title}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                        <span>{pkg.completion_pct}% complete</span>
+                        <span>{pkg.time_spent}</span>
+                        {pkg.latest_score !== null && <span>Score: {pkg.latest_score}%</span>}
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex-shrink-0 ml-3">
+                      Launch &rarr;
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Assignments */}
         <section>

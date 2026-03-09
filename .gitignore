@@ -1,6 +1,14 @@
 # WordPress core — exclude everything, then whitelist our plugin
 app/public/*
 !app/public/wp-content/
+!app/public/scorm-packages/
+
+# SCORM packages (large binary content, only keep bridge.html in git)
+app/public/scorm-packages/*/assets/
+app/public/scorm-packages/*/fonts/
+app/public/scorm-packages/*/images/
+app/public/scorm-packages/*/styles/
+app/public/scorm-packages/*/index.html
 app/public/wp-content/*
 !app/public/wp-content/plugins/
 app/public/wp-content/plugins/*
