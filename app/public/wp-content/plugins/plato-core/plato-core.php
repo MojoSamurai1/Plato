@@ -107,6 +107,10 @@ add_action( 'rest_api_init', function () {
             header( 'Access-Control-Allow-Credentials: true' );
         }
 
+        // Prevent reverse-proxy (SiteGround) from caching authenticated API responses.
+        header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+        header( 'Pragma: no-cache' );
+
         return $value;
     } );
 }, 15 );
